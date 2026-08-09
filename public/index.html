@@ -2854,7 +2854,84 @@
     updateControlModeUI();
   }
 
-  function cloneStage(index) { return STAGES[index].map(row=>row.slice()); }
+  // Official stages keep deterministic physics, while their margin for error tightens
+  // as the stage number rises. Community maps stay on the shared verifier rules.
+  const OFFICIAL_DANGER_BANDS = Object.freeze([
+    {addedHazards:0,bombHazards:0},
+    {addedHazards:0,bombHazards:0},
+    {addedHazards:1,bombHazards:0},
+    {addedHazards:1,bombHazards:0},
+    {addedHazards:2,bombHazards:1},
+    {addedHazards:2,bombHazards:1},
+    {addedHazards:3,bombHazards:1},
+    {addedHazards:3,bombHazards:2},
+    {addedHazards:4,bombHazards:3},
+    {addedHazards:5,bombHazards:4}
+  ]);
+
+  function officialDangerProfile(index) {
+    const safeIndex=Math.max(0,Math.min(STAGES.length-1,Math.trunc(Number(index)||0)));
+    const stageNumber=safeIndex+1;
+    const band=Math.min(OFFICIAL_DANGER_BANDS.length-1,Math.floor(safeIndex/10));
+    const pressure=stageNumber<=20?0:(stageNumber-20)/80;
+    return {
+      level:band+1,
+      pressure,
+      ...OFFICIAL_DANGER_BANDS[band],
+      fragileDelay:.18-.08*pressure,
+      bombHitScale:.88+.08*pressure,
+      bombInset:3-1.5*pressure
+    };
+  }
+
+  function officialDangerCandidates(stage,index) {
+    const preferred=STAGE_META[index]?.spawn||[1,2];
+    const exitRows=[];
+    for(let r=0;r<15;r++)if(stage[r]?.[19]===0)exitRows.push(r);
+    const candidates=[];
+    for(let r=1;r<15;r++)for(let c=2;c<=16;c++){
+      // Only replace a stable, exposed platform with a two-tile landing on at
+      // least one side. It stays a single jumpable gap, never a required wall.
+      if(stage[r]?.[c]!==1||stage[r-1]?.[c]!==0||stage[r]?.[c-1]!==1||stage[r]?.[c+1]!==1)continue;
+      if(stage[r]?.[c-2]!==1&&stage[r]?.[c+2]!==1)continue;
+      if(Math.abs(c-preferred[0])<=3&&r>=preferred[1]&&r<=preferred[1]+4)continue;
+      if(c>=15&&exitRows.some(exitRow=>Math.abs(exitRow-r)<=2))continue;
+      let nearbyHazards=0;
+      for(let rr=Math.max(0,r-1);rr<=Math.min(14,r+1);rr++)for(let cc=Math.max(0,c-2);cc<=Math.min(19,c+2);cc++){
+        if(stage[rr][cc]===3||stage[rr][cc]===6)nearbyHazards++;
+      }
+      candidates.push({r,c,nearbyHazards});
+    }
+    return candidates;
+  }
+
+  function applyOfficialDanger(stage,index) {
+    const profile=officialDangerProfile(index);
+    const candidates=officialDangerCandidates(stage,index);
+    const selected=[];
+    for(let slot=0;slot<profile.addedHazards;slot++){
+      const targetColumn=4+((index*5+slot*7)%13);
+      let best=null,bestScore=Infinity;
+      for(const candidate of candidates){
+        if(selected.some(other=>Math.abs(other.c-candidate.c)<2||(Math.abs(other.r-candidate.r)<=1&&Math.abs(other.c-candidate.c)<3)))continue;
+        const tieBreak=((candidate.r*23+candidate.c*17+index*13)%19)/100;
+        const score=candidate.nearbyHazards*24+Math.abs(candidate.c-targetColumn)*4+(14-candidate.r)*.35+tieBreak;
+        if(score<bestScore){best=candidate;bestScore=score;}
+      }
+      if(!best)break;
+      selected.push(best);
+    }
+    // If a sparse map offers fewer safe slots than requested, keep the lethal
+    // part of the budget first so late stages cannot fall back to harmless ice.
+    const bombSlots=Math.min(profile.bombHazards,selected.length);
+    const fragileSlots=selected.length-bombSlots;
+    selected.forEach((cell,slot)=>{stage[cell.r][cell.c]=slot<fragileSlots?3:6;});
+    return stage;
+  }
+
+  function cloneStage(index) {
+    return applyOfficialDanger(STAGES[index].map(row=>row.slice()),index);
+  }
 
   function showAppToast(message){
     const el=$('appToast');
@@ -3380,7 +3457,8 @@
     setTimeout(()=>ui.tip.classList.add('hidden'),stageIndex<10?5600:3600);
     if(showToast) {
       const courseLabel=stageMeta.kind==='classic'?`CHAPTER ${stageMeta.chapter} · CLASSIC`:`CHAPTER ${stageMeta.chapter} · 연습 ${stageMeta.phase}/4`;
-      ui.stageToast.innerHTML = `<span>${courseLabel} · ${controlMode==='joystick'?'스틱':'터치'} 조작</span><b>STAGE ${stageIndex+1} / ${STAGES.length}</b>`;
+      const dangerLevel=officialDangerProfile(stageIndex).level;
+      ui.stageToast.innerHTML = `<span>${courseLabel} · 위험도 ${dangerLevel}/10</span><b>STAGE ${stageIndex+1} / ${STAGES.length}</b>`;
       ui.stageToast.classList.add('show');
       setTimeout(()=>ui.stageToast.classList.remove('show'),1500);
       if(playStageSfx)SFX.stageStart();
@@ -3558,16 +3636,19 @@
   }
 
   function checkBombs() {
-    const hitX = player.rx*0.88, hitY = player.ry*0.88;
+    const danger=customMode?{bombHitScale:.88,bombInset:3}:officialDangerProfile(stageIndex);
+    const hitX = player.rx*danger.bombHitScale, hitY = player.ry*danger.bombHitScale;
     const minC=Math.floor((player.x-hitX)/TILE),maxC=Math.floor((player.x+hitX)/TILE),minR=Math.floor((player.y-hitY)/TILE),maxR=Math.floor((player.y+hitY)/TILE);
-    for(let r=minR;r<=maxR;r++) for(let c=minC;c<=maxC;c++) if(tileAt(r,c)===6 && ellipseRect(player.x,player.y,hitX,hitY,c*TILE+3,r*TILE+3,TILE-6,TILE-6)) { die('bomb'); return true; }
+    const inset=danger.bombInset;
+    for(let r=minR;r<=maxR;r++) for(let c=minC;c<=maxC;c++) if(tileAt(r,c)===6 && ellipseRect(player.x,player.y,hitX,hitY,c*TILE+inset,r*TILE+inset,TILE-inset*2,TILE-inset*2)) { die('bomb'); return true; }
     return false;
   }
 
   function queueFragileBreak(r,c) {
     if (grid[r]?.[c] !== 3) return;
     const key=r+','+c;
-    if(!breakTimers.has(key)){breakTimers.set(key,.18);SFX.fragileCrack();}
+    const delay=customMode?.18:officialDangerProfile(stageIndex).fragileDelay;
+    if(!breakTimers.has(key)){breakTimers.set(key,delay);SFX.fragileCrack();}
   }
 
   function arrowDirectionForTile(t) {

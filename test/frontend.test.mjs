@@ -13,6 +13,34 @@ function frontendFunction(name, nextName) {
   return new Function(`${source}; return ${name};`)();
 }
 
+function embeddedArray(name) {
+  const declaration = html.indexOf(`  const ${name} =`);
+  const start = html.indexOf('[', declaration);
+  const end = html.indexOf('];', start);
+  assert.notEqual(declaration, -1, `${name} declaration must exist`);
+  assert.notEqual(start, -1, `${name} array must start`);
+  assert.notEqual(end, -1, `${name} array must end`);
+  return new Function(`return (${html.slice(start, end + 1)});`)();
+}
+
+function officialDangerFixture() {
+  const stages = embeddedArray('RAW_STAGES').map((stage) =>
+    stage.trim().split('\n').map((row) => [...row].map(Number)),
+  );
+  const stageMeta = embeddedArray('STAGE_META');
+  const start = html.indexOf('  const OFFICIAL_DANGER_BANDS');
+  const end = html.indexOf('\n\n  function showAppToast', start);
+  assert.notEqual(start, -1, 'official danger rules must exist');
+  assert.notEqual(end, -1, 'official danger rules must be self-contained');
+  const source = html.slice(start, end);
+  const api = new Function(
+    'STAGES',
+    'STAGE_META',
+    `${source}; return {officialDangerProfile, officialDangerCandidates, applyOfficialDanger, cloneStage};`,
+  )(stages, stageMeta);
+  return { stages, stageMeta, source, ...api };
+}
+
 function validCustomMap() {
   const grid = Array.from({ length: 15 }, () => Array(20).fill(1));
   for (let row = 1; row < 14; row += 1) {
@@ -133,6 +161,80 @@ test('mobile viewport fills the surface and follows the player without page scro
   assert.match(html, /\.community-card>\.community-primary\{grid-row:6\}/);
   assert.match(html, /\.editor-tools\{grid-template-columns:repeat\(5,minmax\(44px,1fr\)\)/);
   assert.doesNotMatch(html, /body\{padding:3px\}#app\{width:min\(100vw/);
+});
+
+test('official-stage danger rises deterministically while custom-map physics stays fixed', () => {
+  const { stages, source, officialDangerProfile, cloneStage } = officialDangerFixture();
+  assert.equal(stages.length, 100);
+  assert.doesNotMatch(source, /Math\.random/, 'official danger must never use random deaths');
+
+  const profiles = stages.map((_, index) => officialDangerProfile(index));
+  for (let index = 1; index < profiles.length; index += 1) {
+    const previous = profiles[index - 1];
+    const current = profiles[index];
+    assert.ok(current.level >= previous.level, `danger level fell at stage ${index + 1}`);
+    assert.ok(current.pressure >= previous.pressure, `pressure fell at stage ${index + 1}`);
+    assert.ok(current.addedHazards >= previous.addedHazards, `hazard budget fell at stage ${index + 1}`);
+    assert.ok(current.bombHazards >= previous.bombHazards, `bomb budget fell at stage ${index + 1}`);
+    assert.ok(current.fragileDelay <= previous.fragileDelay, `fragile delay rose at stage ${index + 1}`);
+    assert.ok(current.bombHitScale >= previous.bombHitScale, `bomb tolerance rose at stage ${index + 1}`);
+    assert.ok(current.bombInset <= previous.bombInset, `bomb inset rose at stage ${index + 1}`);
+    if (index >= 20) assert.ok(current.pressure > previous.pressure, `late pressure must rise at stage ${index + 1}`);
+  }
+  assert.equal(profiles[19].fragileDelay, 0.18, 'stages 1-20 remain the teaching section');
+  assert.ok(Math.abs(profiles[99].fragileDelay - 0.1) < 1e-12);
+  assert.ok(Math.abs(profiles[99].bombHitScale - 0.96) < 1e-12);
+  assert.ok(Math.abs(profiles[99].bombInset - 1.5) < 1e-12);
+
+  const originalSnapshot = structuredClone(stages);
+  const enhancedStages = stages.map((original, index) => {
+    const first = cloneStage(index);
+    const second = cloneStage(index);
+    assert.deepEqual(first, second, `stage ${index + 1} danger placement must be deterministic`);
+    const changes = [];
+    for (let row = 0; row < 15; row += 1) for (let column = 0; column < 20; column += 1) {
+      if (first[row][column] === original[row][column]) continue;
+      changes.push({ row, column, tile: first[row][column] });
+      assert.equal(original[row][column], 1, 'only stable ice may be replaced');
+      assert.ok(first[row][column] === 3 || first[row][column] === 6, 'danger tiles must be fragile ice or bombs');
+      assert.equal(original[row - 1][column], 0, 'danger tile must be on an exposed surface');
+      assert.equal(original[row][column - 1], 1, 'danger tile must retain a stable left landing');
+      assert.equal(original[row][column + 1], 1, 'danger tile must retain a stable right landing');
+      assert.ok(
+        original[row][column - 2] === 1 || original[row][column + 2] === 1,
+        'at least one side of a danger tile must retain a two-tile landing',
+      );
+    }
+    assert.ok(changes.length <= profiles[index].addedHazards, 'safe placement may skip, never exceed, its budget');
+    const addedBombs = changes.filter((change) => change.tile === 6).length;
+    assert.equal(
+      addedBombs,
+      Math.min(profiles[index].bombHazards, changes.length),
+      'sparse late maps must preserve the lethal part of their danger budget',
+    );
+    for (let a = 0; a < changes.length; a += 1) for (let b = a + 1; b < changes.length; b += 1) {
+      const rowGap = Math.abs(changes[a].row - changes[b].row);
+      const columnGap = Math.abs(changes[a].column - changes[b].column);
+      assert.ok(columnGap >= 2 && (rowGap > 1 || columnGap >= 3), 'procedural danger tiles must stay separated');
+    }
+    return first;
+  });
+  assert.deepEqual(stages, originalSnapshot, 'official source maps must remain immutable');
+  assert.deepEqual(enhancedStages[19], stages[19], 'stage 20 must remain unchanged');
+  assert.notDeepEqual(enhancedStages[20], stages[20], 'stage 21 starts the rising hazard curve');
+
+  const previouslySafeLateStages = [80, 81, 82, 83, 90, 91, 92, 93];
+  for (const index of previouslySafeLateStages) {
+    const originalBombs = stages[index].flat().filter((tile) => tile === 6).length;
+    const enhancedBombs = enhancedStages[index].flat().filter((tile) => tile === 6).length;
+    assert.ok(enhancedBombs >= originalBombs + 2, `stage ${index + 1} must gain meaningful lethal risk`);
+  }
+  const lateBombMaps = enhancedStages.slice(80).filter((stage) => stage.flat().includes(6)).length;
+  assert.ok(lateBombMaps >= 18, 'at least nine tenths of stages 81-100 must contain bombs');
+
+  assert.match(html, /const danger=customMode\?\{bombHitScale:\.88,bombInset:3\}:officialDangerProfile\(stageIndex\)/);
+  assert.match(html, /const delay=customMode\?\.18:officialDangerProfile\(stageIndex\)\.fragileDelay/);
+  assert.match(html, /위험도 \$\{dangerLevel\}\/10/);
 });
 
 test('pause menu exposes every control directly below the break heading', () => {
