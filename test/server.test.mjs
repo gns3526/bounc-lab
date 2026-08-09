@@ -84,7 +84,7 @@ async function publishMap(baseUrl, map, { token = OWNER_TOKEN, title = '테스�
 }
 
 test('health endpoint and static file serving work', async (t) => {
-  const { baseUrl } = await startFixture(t);
+  const { baseUrl, publicDirectory } = await startFixture(t);
 
   const health = await api(baseUrl, '/api/health');
   assert.equal(health.response.status, 200);
@@ -96,6 +96,11 @@ test('health endpoint and static file serving work', async (t) => {
   assert.equal(home.status, 200);
   assert.match(await home.text(), /Bounce fixture/);
   assert.equal(home.headers.get('x-content-type-options'), 'nosniff');
+
+  await writeFile(resolve(publicDirectory, 'theme.mp3'), Buffer.from('ID3'));
+  const music = await fetch(`${baseUrl}/theme.mp3`);
+  assert.equal(music.status, 200);
+  assert.equal(music.headers.get('content-type'), 'audio/mpeg');
 
   const missingApi = await api(baseUrl, '/api/nope');
   assert.equal(missingApi.response.status, 404);

@@ -15,7 +15,9 @@ npm start
 ## 주요 기능
 
 - 기존 공식 100개 스테이지와 자동 바운드 물리 보존
+- 두 곡이 순서대로 반복되는 펭귄 바운스 BGM과 합성 효과음
 - PC 키보드와 모바일 스틱/좌우 터치 조작
+- 세로·가로 화면을 채우며 펭귄을 따라가는 모바일 카메라
 - 20×15 온라인 맵 에디터와 자동 임시저장
 - 현재 맵 버전의 좌우 입력을 서버가 120Hz 결정적 물리 엔진으로 재실행해 실제 클리어된 경우에만 게시 버튼 활성화
 - 맵을 한 칸이라도 바꾸면 클리어 인증 즉시 무효화
@@ -74,6 +76,7 @@ npm run build:toss:dev
 
 ```text
 public/index.html    게임·에디터·온라인 갤러리
+public/assets/audio/ 두 곡의 BGM 음원
 public/toss-bridge.js 앱인토스 사용자·Safe Area·공유·종료 어댑터
 apps-in-toss.config.ts SDK 3 미니앱 설정
 vite.config.mjs      웹/Toss 번들 설정

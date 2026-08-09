@@ -244,13 +244,12 @@
     .start-actions .menu-btn.primary{grid-column:auto;font-size:13px}
     #selectBtn,#helpBtn,#customPlayBtn{display:none}
     .start-note{margin-top:12px;padding:8px 10px;border-radius:12px;background:#ecf8ff;color:#537493;font-size:11px;font-weight:850;line-height:1.45}
-    .secondary-menu{margin-top:12px;border:2px solid #c6e4f4;border-radius:13px;background:#f3fbff;text-align:left}
-    .secondary-menu summary{padding:9px 12px;cursor:pointer;color:#496d8f;font-size:11px;font-weight:1000;list-style:none}
-    .secondary-menu summary::-webkit-details-marker{display:none}
-    .secondary-menu summary::after{content:"＋";float:right}
-    .secondary-menu[open] summary::after{content:"−"}
-    .secondary-menu .menu-row{margin:0;padding:0 8px 9px}
-    .secondary-menu .menu-btn{min-height:38px;border-width:2px;font-size:11px;box-shadow:none}
+    .pause-card{width:min(520px,96%)}
+    .pause-resume{grid-template-columns:1fr}
+    .pause-controls{margin-top:12px;border:2px solid #c6e4f4;border-radius:13px;background:#f3fbff;text-align:left;overflow:hidden}
+    .pause-controls .setting-row{border-top:0}
+    .pause-controls .menu-row{margin:0;padding:0 8px 9px}
+    .pause-controls .menu-btn{min-height:38px;border-width:2px;font-size:11px;box-shadow:none}
     .setting-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:8px 10px;border-top:1px solid #d6edf8;color:#496d8f;font-size:11px;font-weight:900}
     .setting-row select{min-height:34px;border:2px solid #8bc4e4;border-radius:9px;background:white;color:#315c88;font:900 11px inherit;padding:0 7px}
     .editor-actions{display:block}
@@ -314,7 +313,7 @@
       .toast-inline{position:fixed;bottom:max(14px,env(safe-area-inset-bottom))}
     }
 
-    /* Mobile viewport contract: the page never scrolls; the game is always a contained 4:3 frame. */
+    /* The page stays fixed while a player-following camera crops the 4:3 world for each orientation. */
     #game,.joystick,canvas.editor-canvas,.touch-zones{touch-action:none}
     .card,.levels,.community-grid{
       touch-action:pan-y;
@@ -521,9 +520,7 @@
         linear-gradient(#76c9f5 0%,#c9efff 64%,#eafaff 100%);
     }
     html.toss-miniapp #game{
-      left:50%;right:auto;top:50%;bottom:auto;
-      width:min(100%,calc(100dvh * 4 / 3));height:auto;aspect-ratio:4/3;
-      transform:translate(-50%,-50%);
+      inset:0;width:100%;height:100%;aspect-ratio:auto;transform:none;
     }
     html.toss-miniapp .hud{
       left:max(6px,calc(var(--toss-safe-left) + 6px));
@@ -553,6 +550,10 @@
   </style>
 </head>
 <body>
+<audio id="bgmAudio" preload="metadata" playsinline hidden aria-hidden="true">
+  <source data-bgm-track src="./assets/audio/penguin-bounce-01.mp3" type="audio/mpeg" />
+  <source data-bgm-track src="./assets/audio/penguin-bounce-02.mp3" type="audio/mpeg" />
+</audio>
 <div id="app">
   <div class="game-wrap" id="gameWrap">
     <div class="hud" aria-label="게임 상태">
@@ -574,7 +575,7 @@
   </div>
 
     
-    <canvas id="game" width="640" height="480" aria-label="펭귄 공튀기기 게임"></canvas>
+    <canvas id="game" width="640" height="480" tabindex="0" aria-label="펭귄 공튀기기 게임"></canvas>
     <div class="stage-toast" id="stageToast"><span>CHAPTER 1 · 연습 1/4</span><b>STAGE 1 / 100</b></div>
     <div class="tip" id="tip">펭귄은 항상 같은 힘으로 자동 점프해요. <b>좌우 입력만</b> 사용하세요!</div>
     <div class="touch-zones" id="touchZones" aria-hidden="true">
@@ -600,12 +601,11 @@
     </section>
 
     <section class="overlay hidden" id="pauseOverlay">
-      <div class="card">
+      <div class="card pause-card">
         <h2>잠깐 쉬어가기</h2>
         <p class="sub">자동 바운드는 멈춰 있어요.</p>
-        <div class="menu-row"><button class="menu-btn primary" id="resumeBtn">계속하기</button></div>
-        <details class="secondary-menu">
-          <summary>게임 설정과 다른 메뉴</summary>
+        <div class="menu-row pause-resume"><button class="menu-btn primary" id="resumeBtn">계속하기</button></div>
+        <div class="pause-controls">
           <div class="setting-row"><span>조작 방식</span><select id="controlModeSelect" aria-label="조작 방식"><option value="joystick">스틱</option><option value="touch">화면 좌우 터치</option></select></div>
           <div class="menu-row">
             <button class="menu-btn" id="pauseRestartBtn">처음부터</button>
@@ -613,7 +613,7 @@
             <button class="menu-btn" id="pauseSelectBtn">스테이지 선택</button>
             <button class="menu-btn" id="pauseEditorBtn">복사해서 새 맵 만들기</button>
           </div>
-        </details>
+        </div>
       </div>
     </section>
 
@@ -2307,7 +2307,7 @@
   const ui = {
     stageText:$('stageText'), boundText:$('boundText'), scoreText:$('scoreText'),
     joystickModeBtn:$('joystickModeBtn'), touchModeBtn:$('touchModeBtn'),
-    soundBtn:$('soundBtn'), restartBtn:$('restartBtn'), pauseBtn:$('pauseBtn'),
+    soundBtn:$('soundBtn'), restartBtn:$('restartBtn'), pauseBtn:$('pauseBtn'), bgmAudio:$('bgmAudio'),
     startOverlay:$('startOverlay'), pauseOverlay:$('pauseOverlay'), clearOverlay:$('clearOverlay'), selectOverlay:$('selectOverlay'), helpOverlay:$('helpOverlay'), editorOverlay:$('editorOverlay'), communityOverlay:$('communityOverlay'), exitOverlay:$('exitOverlay'),
     stageToast:$('stageToast'), tip:$('tip'), levelGrid:$('levelGrid'),
     mapEditorBtn:$('mapEditorBtn'), customPlayBtn:$('customPlayBtn'), pauseEditorBtn:$('pauseEditorBtn'),
@@ -2441,9 +2441,88 @@
     rot:0,squash:0,facing:1,lastWall:0,lastWallSide:0,lastWallTile:0,alive:true,clear:false,spawnX:48,spawnY:64,lastSafeX:48,lastSafeY:64
   };
 
+  const gameCamera={x:0,y:0,viewW:WORLD_W,viewH:WORLD_H,scale:1,renderScale:1};
+  const clampCamera=(value,min,max)=>Math.max(min,Math.min(max,value));
+
+  function snapGameCamera(){
+    gameCamera.x=clampCamera(player.x-gameCamera.viewW*.5,0,Math.max(0,WORLD_W-gameCamera.viewW));
+    gameCamera.y=clampCamera(player.y-gameCamera.viewH*.5,0,Math.max(0,WORLD_H-gameCamera.viewH));
+  }
+
+  function syncGameCanvasViewport(){
+    const cssW=Math.max(1,gameWrap.clientWidth||gameWrap.getBoundingClientRect().width||WORLD_W);
+    const cssH=Math.max(1,gameWrap.clientHeight||gameWrap.getBoundingClientRect().height||WORLD_H);
+    const dpr=Math.min(2,Math.max(1,window.devicePixelRatio||1));
+    const pixelW=Math.max(1,Math.round(cssW*dpr));
+    const pixelH=Math.max(1,Math.round(cssH*dpr));
+    if(canvas.width!==pixelW||canvas.height!==pixelH){
+      canvas.width=pixelW;
+      canvas.height=pixelH;
+      ctx.imageSmoothingEnabled=true;
+      ctx.imageSmoothingQuality='high';
+    }
+    const coverScale=Math.max(cssW/WORLD_W,cssH/WORLD_H);
+    gameCamera.scale=coverScale;
+    gameCamera.renderScale=coverScale*dpr;
+    gameCamera.viewW=Math.min(WORLD_W,cssW/coverScale);
+    gameCamera.viewH=Math.min(WORLD_H,cssH/coverScale);
+    snapGameCamera();
+  }
+
+  function cameraAxisTarget(position,current,viewSize,worldSize){
+    if(viewSize>=worldSize)return 0;
+    const low=current+viewSize*.32;
+    const high=current+viewSize*.68;
+    let target=current;
+    if(position<low)target=position-viewSize*.32;
+    else if(position>high)target=position-viewSize*.68;
+    return clampCamera(target,0,worldSize-viewSize);
+  }
+
+  function updateGameCamera(){
+    const targetX=cameraAxisTarget(player.x,gameCamera.x,gameCamera.viewW,WORLD_W);
+    const targetY=cameraAxisTarget(player.y,gameCamera.y,gameCamera.viewH,WORLD_H);
+    gameCamera.x+=(targetX-gameCamera.x)*.16;
+    gameCamera.y+=(targetY-gameCamera.y)*.16;
+  }
+
   let audioCtx=null, masterGain=null, masterLimiter=null, noiseBuffer=null, arrowLoop=null;
   const SFX_VOLUME=4.2;
   const sfxLastAt=new Map();
+
+  const BGM_VOLUME=.2;
+  const BGM_TRACKS=[...ui.bgmAudio.querySelectorAll('[data-bgm-track]')].map(source=>source.src);
+  let bgmTrackIndex=0;
+  let bgmActivated=false;
+  ui.bgmAudio.replaceChildren();
+  ui.bgmAudio.volume=BGM_VOLUME;
+  ui.bgmAudio.loop=false;
+
+  function loadBgmTrack(index){
+    if(!BGM_TRACKS.length)return false;
+    bgmTrackIndex=(index+BGM_TRACKS.length)%BGM_TRACKS.length;
+    ui.bgmAudio.src=BGM_TRACKS[bgmTrackIndex];
+    ui.bgmAudio.load();
+    return true;
+  }
+
+  function resumeBgm(){
+    if(!bgmActivated||muted||document.hidden||!BGM_TRACKS.length)return Promise.resolve(false);
+    if(!ui.bgmAudio.src&&!loadBgmTrack(bgmTrackIndex))return Promise.resolve(false);
+    ui.bgmAudio.muted=false;
+    return ui.bgmAudio.play().then(()=>true).catch(()=>false);
+  }
+
+  const BGM={
+    unlock(){bgmActivated=true;return resumeBgm();},
+    resume(){return resumeBgm();},
+    pause(){ui.bgmAudio.pause();},
+    next(){
+      if(!loadBgmTrack(bgmTrackIndex+1))return;
+      resumeBgm();
+    }
+  };
+  ui.bgmAudio.addEventListener('ended',()=>BGM.next());
 
   function clampAudio(v,min,max){return Math.max(min,Math.min(max,v));}
 
@@ -3295,6 +3374,7 @@
     const spawn=findSpawn(grid,stageIndex);
     const stageMeta=STAGE_META[stageIndex]||{chapter:1,phase:1,title:'중간 단계',kind:'bridge'};
     Object.assign(player,{x:spawn.x,y:spawn.y,px:spawn.x,py:spawn.y,vx:stageIndex<5?32:0,vy:0,rot:0,squash:0,facing:1,lastWall:0,lastWallSide:0,lastWallTile:0,alive:true,clear:false,spawnX:spawn.x,spawnY:spawn.y,lastSafeX:spawn.x,lastSafeY:spawn.y});
+    snapGameCamera();
     ui.tip.innerHTML = `<b>${stageMeta.title}</b> · ${stageTips[stageIndex] || '오른쪽 벽의 빈 틈이 출구예요. 특수 블록의 반동을 이용하세요.'}`;
     ui.tip.classList.remove('hidden');
     setTimeout(()=>ui.tip.classList.add('hidden'),stageIndex<10?5600:3600);
@@ -3319,6 +3399,7 @@
     boundCount=0;stageTime=0;stageIntro=.65;deathTimer=0;clearTimer=0;shake=0;hintPath=[];
     const spawn={x:(customMapData.spawn.c+.5)*TILE,y:(customMapData.spawn.r+.5)*TILE};
     Object.assign(player,{x:spawn.x,y:spawn.y,px:spawn.x,py:spawn.y,vx:0,vy:0,rot:0,squash:0,facing:1,lastWall:0,lastWallSide:0,lastWallTile:0,alive:true,clear:false,spawnX:spawn.x,spawnY:spawn.y,lastSafeX:spawn.x,lastSafeY:spawn.y});
+    snapGameCamera();
     if(playContext==='draft-test'&&activeAttempt)resetVerificationReplay();
     ui.tip.innerHTML=playContext==='community'?'온라인 맵 도전 · 좌우 이동만으로 출구에 도착하세요.':'내 맵 검증 · 직접 클리어하면 온라인 게시가 열립니다.';
     ui.tip.classList.remove('hidden');setTimeout(()=>ui.tip.classList.add('hidden'),3000);
@@ -3837,7 +3918,13 @@
 
   function render(timeMs) {
     const time=timeMs/1000;
-    ctx.save();if(shake>0)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
+    updateGameCamera();
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const drawScale=gameCamera.renderScale;
+    ctx.save();
+    ctx.setTransform(drawScale,0,0,drawScale,-gameCamera.x*drawScale,-gameCamera.y*drawScale);
+    if(shake>0)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
     drawBackground(time);drawExit(time);
     for(let r=0;r<15;r++)for(let c=0;c<20;c++){const t=grid[r]?.[c]||0;if(t)drawTile(t,c,r,time);}
     drawTrail();drawPlayer(time);drawParticles();
@@ -4019,18 +4106,24 @@
     }
   }
 
-  addEventListener('pointerdown',()=>SFX.unlock(),{capture:true,passive:true});
-  addEventListener('keydown',()=>SFX.unlock(),{capture:true});
-  addEventListener('pageshow',()=>{if(!muted)SFX.unlock();});
+  function unlockGameAudio(){
+    SFX.unlock();
+    BGM.unlock();
+  }
+  addEventListener('pointerdown',unlockGameAudio,{capture:true,passive:true});
+  addEventListener('keydown',unlockGameAudio,{capture:true});
+  addEventListener('pageshow',()=>{if(!muted){SFX.unlock();BGM.resume();}});
+  addEventListener('pagehide',()=>BGM.pause());
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
       input.keyLeft=input.keyRight=false;
       releasePointerControl();
       SFX.stopContinuous();
+      BGM.pause();
       if(state==='playing'&&!paused)togglePause(true,true);
       return;
     }
-    if(!muted)SFX.unlock();
+    if(!muted){SFX.unlock();BGM.resume();}
   });
   addEventListener('bounc:toss-back',openExitDialog);
 
@@ -4056,7 +4149,8 @@
     if(e.code==='ArrowLeft'||e.code==='KeyA'){input.keyLeft=false;syncDirectionalInput();}
     if(e.code==='ArrowRight'||e.code==='KeyD'){input.keyRight=false;syncDirectionalInput();}
   });
-  addEventListener('blur',()=>{input.keyLeft=input.keyRight=false;releasePointerControl();if(state==='playing'&&!paused)togglePause(true,true);});
+  addEventListener('blur',()=>{input.keyLeft=input.keyRight=false;releasePointerControl();BGM.pause();if(state==='playing'&&!paused)togglePause(true,true);});
+  addEventListener('focus',()=>{if(!muted)BGM.resume();});
 
   ui.mapEditorBtn.onclick=()=>{SFX.ui();openMapEditor('startOverlay','',false);};
   ui.customPlayBtn.onclick=()=>{if(customMapData||readSavedCustomMap())startCustomGame();else openMapEditor('startOverlay','먼저 맵을 만들어 저장해주세요.',false);};
@@ -4092,11 +4186,13 @@
     const verticalPadding=(parseFloat(bodyStyle.paddingTop)||0)+(parseFloat(bodyStyle.paddingBottom)||0);
     const availableW=Math.max(1,viewportW-horizontalPadding);
     const availableH=Math.max(1,viewportH-verticalPadding);
-    const appW=Math.min(980,availableW,availableH*(4/3));
-    const appH=appW*(3/4);
+    const compactSurface=viewportW<=900||viewportH<=650||root.classList.contains('toss-miniapp');
+    const appW=compactSurface?availableW:Math.min(980,availableW,availableH*(4/3));
+    const appH=compactSurface?availableH:appW*(3/4);
     root.style.setProperty('--app-w',`${appW}px`);
     root.style.setProperty('--app-h',`${appH}px`);
     root.style.setProperty('--editor-landscape-canvas-w',`${Math.max(150,(viewportH-108)*(4/3))}px`);
+    syncGameCanvasViewport();
 
     if(controlPointer!==null)releasePointerControl();
     if(editorDrawing)finishEditorPointer();
@@ -4130,7 +4226,7 @@
   $('clearRetryBtn').onclick=()=>startGame(stageIndex);
   $('clearSelectBtn').onclick=()=>{SFX.ui();buildLevelGrid();setOverlay('selectOverlay');};
   ui.pauseBtn.onclick=()=>togglePause();ui.restartBtn.onclick=()=>restartStage();
-  ui.soundBtn.onclick=async()=>{muted=!muted;safeStore.set('penguinBoundMutedSoundpackV2',muted?'1':'0');if(muted)SFX.stopContinuous();else{await SFX.unlock();SFX.ui('confirm');if(arrowDriveActive&&!paused)SFX.resumeArrow(arrowDir);}updateHUD();};
+  ui.soundBtn.onclick=async()=>{muted=!muted;safeStore.set('penguinBoundMutedSoundpackV2',muted?'1':'0');if(muted){SFX.stopContinuous();BGM.pause();}else{await Promise.all([SFX.unlock(),BGM.unlock()]);SFX.ui('confirm');if(arrowDriveActive&&!paused)SFX.resumeArrow(arrowDir);}updateHUD();};
   ui.joystickModeBtn.onclick=()=>setControlMode('joystick');
   ui.touchModeBtn.onclick=()=>setControlMode('touch');
   $('controlModeSelect').onchange=e=>setControlMode(e.target.value);
