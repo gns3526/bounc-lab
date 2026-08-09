@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from '@apps-in-toss/web-framework/config';
 
-const PROVISIONAL_APP_NAME = 'bounc-lab';
+const CONFIRMED_APP_NAME = 'penguin-bounce';
 
 function readEnvValue(fileName: string, key: string) {
   try {
@@ -28,13 +28,13 @@ function readEnvValue(fileName: string, key: string) {
   return undefined;
 }
 
-// bounc-lab is provisional. Confirm the immutable appName in the Apps in Toss
-// console, then set TOSS_APP_NAME explicitly before a production build/deploy.
+// The Apps in Toss console appName is immutable. Environment overrides are
+// supported for deployment wiring, while release validation rejects mismatches.
 const appName =
   process.env.TOSS_APP_NAME?.trim() ||
   readEnvValue('.env.toss.local', 'TOSS_APP_NAME')?.trim() ||
   readEnvValue('.env.toss', 'TOSS_APP_NAME')?.trim() ||
-  PROVISIONAL_APP_NAME;
+  CONFIRMED_APP_NAME;
 
 export default defineConfig({
   appName,

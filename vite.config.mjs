@@ -1,6 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 
-const PROVISIONAL_APP_NAME = 'bounc-lab';
+const CONFIRMED_APP_NAME = 'penguin-bounce';
 
 function addHtmlClass(html, className) {
   return html.replace(/<html\b([^>]*)>/i, (tag, attributes) => {
@@ -46,7 +46,7 @@ export default defineConfig(({ mode }) => {
   const isTossBuild = mode === 'toss' || mode === 'toss-dev';
   const sharedTossEnv = isTossBuild ? loadEnv('toss', process.cwd(), '') : {};
   const env = { ...sharedTossEnv, ...loadEnv(mode, process.cwd(), '') };
-  const appName = (env.TOSS_APP_NAME || PROVISIONAL_APP_NAME).trim();
+  const appName = (env.TOSS_APP_NAME || CONFIRMED_APP_NAME).trim();
   const apiBaseUrl = (env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
   const localApiProxy = (env.LOCAL_API_PROXY_URL || 'http://127.0.0.1:8787').trim();
 

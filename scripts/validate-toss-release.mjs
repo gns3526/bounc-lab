@@ -11,9 +11,9 @@ const fileEnv = loadEnv(mode, projectRoot, '');
 const env = { ...sharedTossEnv, ...fileEnv, ...process.env };
 const errors = [];
 const warnings = [];
-const provisionalAppName = 'bounc-lab';
+const confirmedAppName = 'penguin-bounce';
 const explicitAppName = env.TOSS_APP_NAME?.trim();
-const appName = explicitAppName || provisionalAppName;
+const appName = explicitAppName || confirmedAppName;
 const apiBaseUrl = env.VITE_API_BASE_URL?.trim() || '';
 
 function requireExactVersion(actual, expected, label) {
@@ -68,11 +68,10 @@ if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(appName)) {
   errors.push('TOSS_APP_NAME must use lowercase kebab-case (letters, numbers, and single hyphens).');
 }
 
-if (!explicitAppName) {
-  const message =
-    'bounc-lab is a provisional appName. Confirm the immutable value in the Apps in Toss console and set TOSS_APP_NAME explicitly.';
-  if (isDevelopment) warnings.push(message);
-  else errors.push(message);
+if (!isDevelopment && explicitAppName && explicitAppName !== confirmedAppName) {
+  errors.push(
+    `TOSS_APP_NAME must match the confirmed Apps in Toss appName (${confirmedAppName}); received ${explicitAppName}.`,
+  );
 }
 
 if (!apiBaseUrl) {
