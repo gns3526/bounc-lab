@@ -45,6 +45,15 @@ function validateAbsoluteUrl(value, { requireHttps }) {
   }
 
   const hostname = url.hostname.toLowerCase();
+  const placeholderHost =
+    hostname === 'example.com' ||
+    hostname.endsWith('.example.com') ||
+    hostname.endsWith('.example') ||
+    hostname.endsWith('.invalid') ||
+    hostname.endsWith('.test');
+  if (requireHttps && placeholderHost) {
+    errors.push('VITE_API_BASE_URL must use the deployed public API host, not a placeholder domain.');
+  }
   if (
     requireHttps &&
     (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname.endsWith('.local'))

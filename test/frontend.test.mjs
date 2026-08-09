@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+const tossBridge = await readFile(new URL('../public/toss-bridge.js', import.meta.url), 'utf8');
 
 function frontendFunction(name, nextName) {
   const start = html.indexOf(`  function ${name}(`);
@@ -122,6 +123,8 @@ test('Apps in Toss hooks cover identity, sharing, safe layout, and confirmed exi
   assert.match(html, /id="exitOverlay" role="dialog" aria-modal="true"/);
   assert.match(html, /document\.hidden/);
   assert.match(html, /SFX\.stopContinuous\(\)/);
+  assert.match(tossBridge, /'penguin-bounce'/);
+  assert.doesNotMatch(tossBridge, /'bounc-lab'/);
 });
 
 test('two bundled BGM tracks form a gesture-unlocked background playlist', async () => {

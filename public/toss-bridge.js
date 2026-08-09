@@ -2,7 +2,7 @@ const root = document.documentElement;
 const isTossMiniapp = root.classList.contains('toss-miniapp');
 const appName =
   document.querySelector('meta[name="toss-app-name"]')?.getAttribute('content')?.trim() ||
-  'bounc-lab';
+  'penguin-bounce';
 
 const SAFE_AREA_EVENT = 'bounc:toss-safe-area';
 const BACK_EVENT = 'bounc:toss-back';
