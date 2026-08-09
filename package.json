@@ -1,0 +1,15 @@
+{
+  "name": "bounce-ball-community",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bounce Ball game and clear-gated community map server",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "test": "node --test --test-concurrency=1"
+  }
+}
