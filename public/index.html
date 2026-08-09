@@ -16,14 +16,25 @@
       --pink:#ff6f8e;
       --yellow:#ffc94a;
       --panel:rgba(247,253,255,.94);
+      --viewport-w:100vw;
+      --viewport-h:100dvh;
+      --viewport-x:0px;
+      --viewport-y:0px;
     }
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html,body{margin:0;width:100%;min-height:100%;overscroll-behavior:none}
+    html,body{margin:0;width:100%;height:100%;min-height:0;overflow:hidden;overscroll-behavior:none}
     body{
-      min-height:100dvh;
+      height:100vh;
+      height:100svh;
+      height:var(--viewport-h,100dvh);
+      min-height:0;
       display:grid;
       place-items:center;
-      padding:max(8px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom));
+      padding:
+        max(4px,env(safe-area-inset-top,0px))
+        max(4px,env(safe-area-inset-right,0px))
+        max(4px,env(safe-area-inset-bottom,0px))
+        max(4px,env(safe-area-inset-left,0px));
       overflow:hidden;
       color:var(--ink);
       background:
@@ -32,12 +43,14 @@
         linear-gradient(#b9edff 0%,#eafaff 54%,#ccefff 100%);
       font-family:Pretendard,"Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
       user-select:none;
-      touch-action:none;
+      touch-action:manipulation;
     }
-    button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:none}
+    button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulation}
     #app{
-      width:min(980px,100vw - 12px);
-      max-height:calc(100dvh - 8px);
+      width:var(--app-w,min(980px,calc(100vw - 8px),calc(133.333dvh - 11px)));
+      height:var(--app-h,auto);
+      max-height:none;
+      aspect-ratio:4/3;
       display:grid;
       grid-template-rows:minmax(0,1fr);
       gap:0;
@@ -78,7 +91,8 @@
     .game-wrap{
       position:relative;
       width:100%;
-      aspect-ratio:4/3;
+      height:100%;
+      aspect-ratio:auto;
       min-height:0;
       overflow:hidden;
       border:4px solid #1d568f;
@@ -203,10 +217,10 @@
     .controls.no-hint{justify-content:flex-end}
     .controls.no-hint .control-guide{margin-left:auto;margin-right:0}
     @media(max-width:620px){
-      body{padding:5px}#app{width:100%;max-height:100dvh;gap:0}.editor-card{padding:6px}.editor-layout{grid-template-columns:minmax(0,1fr) 128px;gap:5px}.editor-head{margin-bottom:4px}.editor-head h2{font-size:17px}.editor-head p{font-size:8px}.editor-tools{gap:3px}.editor-tool{min-height:32px;font-size:7px;border-radius:7px}.editor-tool b{font-size:13px}.editor-action{min-height:28px;font-size:8px}.editor-action.primary{min-height:32px;font-size:9px}.editor-note{font-size:7px;padding:4px}.editor-status{font-size:8px;min-height:22px;padding:3px}.hud{left:5px;right:5px;top:5px;padding:4px;gap:4px;min-height:42px;border-radius:14px}.pill{height:30px;padding:0 6px;font-size:10px}.pill.control-mode{padding:0 6px;font-size:9px}.pill strong{font-size:13px}.icon-btn{width:32px;height:30px}.controls{left:6px;right:6px;bottom:6px;min-height:60px;gap:6px}.joystick{width:96px;height:96px}.joystick-knob{width:46px;height:46px;margin:-23px 0 0 -23px;font-size:20px}.joy-arrow{font-size:18px}.joy-arrow.left{left:7px}.joy-arrow.right{right:7px}.control-guide{max-width:190px;padding:6px 8px}.control-guide b{font-size:12px}.control-guide span{font-size:9px}.hint-btn{width:64px;min-height:52px;font-size:10px}.game-wrap{border-radius:14px}.tip{font-size:10px;max-width:65%;padding:5px 7px;bottom:72px}.stage-toast{top:60px}.touch-zone{padding-bottom:70px}.touch-zone .touch-mark{width:58px;height:45px;font-size:22px}.hud-group:first-child .pill:nth-child(2){display:none}.hud{grid-template-columns:auto 1fr auto}.hud-group{gap:3px}.levels{grid-template-columns:repeat(4,1fr)}
+      .editor-card{padding:6px}.editor-layout{grid-template-columns:minmax(0,1fr) 128px;gap:5px}.editor-head{margin-bottom:4px}.editor-head h2{font-size:17px}.editor-head p{font-size:8px}.editor-tools{gap:3px}.editor-tool{min-height:32px;font-size:7px;border-radius:7px}.editor-tool b{font-size:13px}.editor-action{min-height:28px;font-size:8px}.editor-action.primary{min-height:32px;font-size:9px}.editor-note{font-size:7px;padding:4px}.editor-status{font-size:8px;min-height:22px;padding:3px}.hud{left:5px;right:5px;top:5px;padding:4px;gap:4px;min-height:42px;border-radius:14px}.pill{height:30px;padding:0 6px;font-size:10px}.pill.control-mode{padding:0 6px;font-size:9px}.pill strong{font-size:13px}.icon-btn{width:32px;height:30px}.controls{left:6px;right:6px;bottom:6px;min-height:60px;gap:6px}.joystick{width:96px;height:96px}.joystick-knob{width:46px;height:46px;margin:-23px 0 0 -23px;font-size:20px}.joy-arrow{font-size:18px}.joy-arrow.left{left:7px}.joy-arrow.right{right:7px}.control-guide{max-width:190px;padding:6px 8px}.control-guide b{font-size:12px}.control-guide span{font-size:9px}.hint-btn{width:64px;min-height:52px;font-size:10px}.game-wrap{border-radius:14px}.tip{font-size:10px;max-width:65%;padding:5px 7px;bottom:72px}.stage-toast{top:60px}.touch-zone{padding-bottom:70px}.touch-zone .touch-mark{width:58px;height:45px;font-size:22px}.hud-group:first-child .pill:nth-child(2){display:none}.hud{grid-template-columns:auto 1fr auto}.hud-group{gap:3px}.levels{grid-template-columns:repeat(4,1fr)}
     }
     @media(orientation:landscape) and (max-height:650px){
-      body{padding:3px}#app{width:min(100vw - 6px,1060px)}.hud{left:5px;right:5px;top:5px}.controls{left:5px;right:5px;bottom:5px}.control-guide{max-width:250px;padding:7px 6px}.hint-btn{min-height:54px}.card{transform:scale(.92)}
+      .hud{left:5px;right:5px;top:5px}.controls{left:5px;right:5px;bottom:5px}.control-guide{max-width:250px;padding:7px 6px}.hint-btn{min-height:54px}
     }
     @media(orientation:landscape) and (max-height:480px){
       .joystick{width:98px;height:98px}.joystick-knob{width:44px;height:44px;margin:-22px 0 0 -22px}.control-guide span{display:none}.hint-btn{min-height:48px}
@@ -280,19 +294,209 @@
     }
     @media(max-width:620px) and (orientation:portrait){
       .overlay{position:fixed;inset:0;z-index:80;padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));background:rgba(19,57,94,.38)}
-      .overlay>.card{width:min(100%,520px);max-height:calc(100dvh - 16px);transform:none}
+      .overlay>.card{width:min(100%,520px);max-height:100%;transform:none}
       .editor-overlay{position:fixed;padding:max(6px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))}
-      .editor-card{width:100%;max-height:calc(100dvh - 12px);padding:8px}
+      .editor-card{width:100%;max-height:100%;padding:8px}
       .editor-layout{grid-template-columns:1fr;gap:7px}
       .editor-tools{grid-template-columns:repeat(9,minmax(44px,1fr));overflow-x:auto;padding-bottom:3px;scroll-snap-type:x proximity}
       .editor-tool{min-width:44px;min-height:44px;font-size:10px;scroll-snap-align:start}
       .editor-tool b{font-size:14px}
       .editor-side{gap:6px}
-      .community-card{width:100%;max-height:calc(100dvh - 16px);overflow-x:hidden}
+      .community-card{width:100%;max-height:100%;overflow-x:hidden}
       .community-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
       .map-card{min-width:0}
       .start-card{width:min(100%,510px)}
       .toast-inline{position:fixed;bottom:max(14px,env(safe-area-inset-bottom))}
+    }
+
+    /* Mobile viewport contract: the page never scrolls; the game is always a contained 4:3 frame. */
+    #game,.joystick,canvas.editor-canvas,.touch-zones{touch-action:none}
+    .card,.levels,.community-grid{
+      touch-action:pan-y;
+      overscroll-behavior:contain;
+      -webkit-overflow-scrolling:touch;
+    }
+    .card{min-width:0;min-height:0}
+    .hud{grid-template-columns:auto minmax(0,1fr) auto}
+
+    #selectOverlay>.card{
+      display:grid;
+      grid-template-rows:auto auto minmax(0,1fr) auto;
+      overflow:hidden;
+    }
+    #selectOverlay>.card>h2{grid-row:1}
+    #selectOverlay>.card>.sub{grid-row:2}
+    #selectOverlay>.card>.levels{grid-row:3}
+    #selectOverlay>.card>.menu-row{grid-row:4}
+    #selectOverlay .levels{min-height:0;overflow-y:auto;padding:2px 2px 7px}
+
+    .community-card{
+      display:grid;
+      grid-template-rows:auto auto auto minmax(0,1fr) auto auto;
+      overflow:hidden;
+    }
+    .community-card>.community-head{grid-row:1}
+    .community-card>.community-toolbar{grid-row:2}
+    .community-card>.community-status{grid-row:3}
+    .community-card>.community-grid{grid-row:4}
+    .community-card>.community-selected{grid-row:5}
+    .community-card>.community-primary{grid-row:6}
+    .community-toolbar{grid-template-columns:minmax(0,1fr) minmax(96px,120px)}
+    .community-toolbar>*{width:100%;min-width:0}
+    .community-grid{min-height:0;overflow-y:auto;align-content:start;padding:2px}
+    .community-selected>div{min-width:0;flex:1;overflow:hidden}
+
+    .editor-card{
+      display:grid;
+      grid-template-rows:auto minmax(0,1fr);
+      overflow:hidden;
+    }
+    .editor-layout,.editor-map-pane,.editor-side{min-width:0;min-height:0}
+    .editor-tools{touch-action:manipulation}
+
+    @media (max-width:900px), (max-height:650px){
+      .overlay{
+        position:fixed;
+        inset:auto;
+        left:var(--viewport-x,0px);
+        top:var(--viewport-y,0px);
+        width:var(--viewport-w,100vw);
+        height:var(--viewport-h,100dvh);
+        z-index:80;
+        padding:
+          max(6px,env(safe-area-inset-top,0px))
+          max(6px,env(safe-area-inset-right,0px))
+          max(6px,env(safe-area-inset-bottom,0px))
+          max(6px,env(safe-area-inset-left,0px));
+        background:rgba(19,57,94,.38);
+      }
+      .overlay>.card{
+        width:min(100%,820px);
+        max-width:100%;
+        max-height:100%;
+        min-width:0;
+        min-height:0;
+        transform:none;
+      }
+      .editor-overlay{padding:max(5px,env(safe-area-inset-top,0px)) max(5px,env(safe-area-inset-right,0px)) max(5px,env(safe-area-inset-bottom,0px)) max(5px,env(safe-area-inset-left,0px))}
+      .editor-card{width:min(100%,900px);height:100%;max-height:100%;transform:none}
+      .community-card{height:100%;max-height:100%}
+      #selectOverlay>.card{height:100%;max-height:100%}
+      .toast-inline{position:fixed;bottom:max(14px,env(safe-area-inset-bottom,0px))}
+    }
+
+    @media (max-width:620px) and (orientation:portrait){
+      .overlay>.card{max-height:100%}
+      .start-card{width:min(100%,510px);padding:12px;overflow:hidden}
+      .logo{width:auto;max-width:86%;max-height:132px;margin-bottom:2px}
+      .start-card .sub{margin-top:6px;font-size:12px;line-height:1.35}
+      .start-card .core-copy{margin-top:8px;padding:7px;font-size:11px;line-height:1.35}
+      .start-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:8px}
+      .start-actions .menu-btn,.start-actions .menu-btn.primary{min-height:60px;padding:5px 2px;font-size:10px;line-height:1.15}
+      .start-actions .menu-btn b{font-size:18px}
+      .start-note{margin-top:8px;padding:6px;font-size:9px;line-height:1.3}
+
+      .editor-card{width:100%;height:100%;max-height:100%;padding:8px}
+      .editor-head{margin-bottom:4px}
+      .editor-head h2{font-size:17px}
+      .editor-layout{grid-template-columns:1fr;grid-template-rows:auto auto;gap:5px;align-content:start;overflow:hidden}
+      .editor-map-pane{display:grid;grid-template-rows:auto auto}
+      .editor-canvas-wrap{width:min(100%,78dvw,340px);height:auto;justify-self:center}
+      .editor-status{margin-top:4px}
+      .editor-tools{grid-template-columns:repeat(5,minmax(44px,1fr));gap:3px;overflow:visible;padding:0;scroll-snap-type:none}
+      .editor-tool{min-width:0;min-height:44px;font-size:9px;scroll-snap-align:none}
+      .editor-side{gap:5px}
+      .publish-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+      .publish-label,.publish-field{min-width:0}
+      .community-card{width:100%;height:100%;max-height:100%;overflow:hidden}
+      .community-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .map-card{min-width:0}
+    }
+
+    @media (max-width:620px) and (orientation:portrait) and (max-height:700px){
+      .logo{max-height:110px}
+      .start-card .sub{font-size:11px}
+      .start-card .core-copy{margin-top:6px;padding:5px;font-size:10px}
+      .start-actions{margin-top:6px}
+      .start-actions .menu-btn,.start-actions .menu-btn.primary{min-height:56px}
+      .start-note{margin-top:6px;padding:5px;font-size:8px}
+
+      .editor-head p,.editor-section-title,.editor-note,.editor-more{display:none}
+      .editor-side{gap:4px}
+      .editor-canvas-wrap{width:min(100%,78dvw,300px)}
+      .editor-status{min-height:21px;padding:3px 5px;font-size:8px}
+      .publish-label{gap:2px;font-size:9px}
+      .publish-field{height:40px;min-height:40px}
+      .verification-badge{padding:5px 6px;font-size:9px}
+      .editor-actions>.editor-action.primary{min-height:44px;margin-top:0}
+      .community-head p{display:none}
+    }
+
+    @media (orientation:landscape) and (max-height:650px){
+      body{
+        padding:
+          max(3px,env(safe-area-inset-top,0px))
+          max(3px,env(safe-area-inset-right,0px))
+          max(3px,env(safe-area-inset-bottom,0px))
+          max(3px,env(safe-area-inset-left,0px));
+      }
+      #app{width:var(--app-w);height:var(--app-h);max-height:none}
+      .card{transform:none}
+
+      .start-card{width:min(620px,100%);padding:8px 12px;overflow:hidden}
+      .start-card .logo{width:auto;max-width:72%;max-height:96px;margin-bottom:1px}
+      .start-card .sub{margin-top:3px;max-width:520px;font-size:11px;line-height:1.3}
+      .start-card .core-copy,.start-note{display:none}
+      .start-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:7px}
+      .start-actions .menu-btn,.start-actions .menu-btn.primary{min-height:52px;padding:4px;font-size:10px}
+      .start-actions .menu-btn b{margin-bottom:1px;font-size:17px}
+
+      .editor-card{padding:6px}
+      .editor-head{min-height:40px;margin-bottom:3px}
+      .editor-head h2{font-size:15px}
+      .editor-head p,.editor-section-title,.editor-note,.editor-more{display:none}
+      .editor-close{width:40px;height:40px}
+      .editor-layout{height:100%;grid-template-columns:minmax(0,1fr) minmax(230px,36%);gap:6px;align-items:stretch;overflow:hidden}
+      .editor-map-pane{display:grid;grid-template-rows:minmax(0,1fr) auto;overflow:hidden}
+      .editor-canvas-wrap{width:min(100%,var(--editor-landscape-canvas-w,376px));height:auto;align-self:start;justify-self:center}
+      .editor-status{min-height:20px;margin-top:3px;padding:2px 5px;font-size:8px}
+      .editor-side{align-content:start;gap:3px;overflow:hidden}
+      .editor-tools{grid-template-columns:repeat(5,minmax(40px,1fr));gap:3px}
+      .editor-tool{min-width:0;min-height:44px;padding:2px;font-size:9px}
+      .editor-tool b{font-size:13px;margin-bottom:1px}
+      .publish-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+      .publish-label{min-width:0;gap:1px;font-size:9px}
+      .publish-field{min-width:0;height:40px;min-height:40px;font-size:16px}
+      .verification-badge{padding:4px 6px;font-size:8px;line-height:1.25}
+      .editor-actions>.editor-action.primary{min-height:44px;margin-top:0;font-size:10px}
+
+      .community-card{padding:7px}
+      .community-head h2{font-size:18px}
+      .community-head p{display:none}
+      .community-toolbar{margin-top:5px}
+      .community-toolbar input,.community-toolbar select{height:40px;min-height:40px;font-size:16px}
+      .community-status{margin:4px 0;font-size:9px}
+      .community-selected{margin-top:5px;padding:6px}
+      .community-primary{min-height:44px;margin-top:5px}
+      #selectOverlay>.card{padding:8px}
+      #selectOverlay .sub{display:none}
+      #selectOverlay .levels{margin-top:5px}
+      #selectOverlay .menu-row{margin-top:5px}
+    }
+
+    @media (max-width:360px){
+      .controls{min-height:42px;bottom:4px}
+      .control-guide{max-width:122px;padding:4px 6px;border-radius:10px}
+      .control-guide b{font-size:9px}
+      .control-guide span{display:none}
+      .tip{bottom:52px}
+    }
+
+    @media (max-width:340px){
+      .hud-brand{font-size:0}
+      .hud-brand::after{content:"LAB";font-size:8px}
+      .pill{padding-inline:4px}
+      .start-card{padding:9px}
     }
   </style>
 </head>
@@ -3662,8 +3866,14 @@
     try{gameWrap.setPointerCapture(e.pointerId);}catch(_){}
     if(controlMode==='joystick'){
       const rect=gameWrap.getBoundingClientRect();
-      joyAnchorX=Math.max(58,Math.min(rect.width-58,e.clientX-rect.left));
-      joyAnchorY=Math.max(68,Math.min(rect.height-58,e.clientY-rect.top));
+      const radius=Math.max(48,(joystickEl.offsetWidth||112)/2);
+      const hudRect=document.querySelector('.hud').getBoundingClientRect();
+      const controlsRect=controlsEl.getBoundingClientRect();
+      const minX=radius+4,maxX=Math.max(minX,rect.width-radius-4);
+      const minY=Math.max(radius+4,hudRect.bottom-rect.top+radius+4);
+      const maxY=Math.max(minY,Math.min(rect.height-radius-4,controlsRect.top-rect.top-radius-4));
+      joyAnchorX=Math.max(minX,Math.min(maxX,e.clientX-rect.left));
+      joyAnchorY=Math.max(minY,Math.min(maxY,e.clientY-rect.top));
       joystickEl.style.left=`${joyAnchorX}px`;
       joystickEl.style.top=`${joyAnchorY}px`;
       joyActive=true;joyVisualX=0;input.joyAxis=0;
@@ -3743,6 +3953,42 @@
   ui.editorCanvas.addEventListener('pointermove',e=>{if(!editorDrawing||e.pointerId!==editorPointer)return;e.preventDefault();if(editorTool==='spawn'||editorTool==='exit')return;const cell=editorCellFromPointer(e);paintEditorCell(cell.c,cell.r);});
   const finishEditorPointer=e=>{if(e&&editorPointer!==null&&e.pointerId!==editorPointer)return;editorDrawing=false;editorPointer=null;};
   ui.editorCanvas.addEventListener('pointerup',finishEditorPointer);ui.editorCanvas.addEventListener('pointercancel',finishEditorPointer);ui.editorCanvas.addEventListener('lostpointercapture',finishEditorPointer);ui.editorCanvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+  let viewportSyncFrame=0;
+  function syncViewportLayout(){
+    viewportSyncFrame=0;
+    const viewport=window.visualViewport;
+    const viewportW=Math.max(1,viewport?.width||window.innerWidth||document.documentElement.clientWidth);
+    const viewportH=Math.max(1,viewport?.height||window.innerHeight||document.documentElement.clientHeight);
+    const root=document.documentElement;
+    root.style.setProperty('--viewport-w',`${viewportW}px`);
+    root.style.setProperty('--viewport-h',`${viewportH}px`);
+    root.style.setProperty('--viewport-x',`${viewport?.offsetLeft||0}px`);
+    root.style.setProperty('--viewport-y',`${viewport?.offsetTop||0}px`);
+
+    const bodyStyle=getComputedStyle(document.body);
+    const horizontalPadding=(parseFloat(bodyStyle.paddingLeft)||0)+(parseFloat(bodyStyle.paddingRight)||0);
+    const verticalPadding=(parseFloat(bodyStyle.paddingTop)||0)+(parseFloat(bodyStyle.paddingBottom)||0);
+    const availableW=Math.max(1,viewportW-horizontalPadding);
+    const availableH=Math.max(1,viewportH-verticalPadding);
+    const appW=Math.min(980,availableW,availableH*(4/3));
+    const appH=appW*(3/4);
+    root.style.setProperty('--app-w',`${appW}px`);
+    root.style.setProperty('--app-h',`${appH}px`);
+    root.style.setProperty('--editor-landscape-canvas-w',`${Math.max(150,(viewportH-108)*(4/3))}px`);
+
+    if(controlPointer!==null)releasePointerControl();
+    if(editorDrawing)finishEditorPointer();
+  }
+  function scheduleViewportLayout(){
+    if(viewportSyncFrame)cancelAnimationFrame(viewportSyncFrame);
+    viewportSyncFrame=requestAnimationFrame(syncViewportLayout);
+  }
+  addEventListener('resize',scheduleViewportLayout,{passive:true});
+  addEventListener('orientationchange',scheduleViewportLayout,{passive:true});
+  window.visualViewport?.addEventListener('resize',scheduleViewportLayout,{passive:true});
+  window.visualViewport?.addEventListener('scroll',scheduleViewportLayout,{passive:true});
+  syncViewportLayout();
 
   $('startBtn').onclick=()=>startGame(stageIndex);
   $('communityBtn').onclick=()=>{SFX.ui();openCommunityOverlay();};

@@ -83,6 +83,21 @@ test('mobile editor keeps essential controls readable and accessible', () => {
   assert.match(html, /env\(safe-area-inset-bottom\)/);
 });
 
+test('mobile viewport stays contained and anchors long overlays', () => {
+  assert.match(html, /function syncViewportLayout\(\)/);
+  assert.match(html, /window\.visualViewport/);
+  assert.match(html, /const appW=Math\.min\(980,availableW,availableH\*\(4\/3\)\)/);
+  assert.match(html, /root\.style\.setProperty\('--app-h'/);
+  assert.match(html, /addEventListener\('orientationchange',scheduleViewportLayout/);
+  assert.match(html, /window\.visualViewport\?\.addEventListener\('resize',scheduleViewportLayout/);
+  assert.match(html, /#selectOverlay>\.card>\.levels\{grid-row:3\}/);
+  assert.match(html, /#selectOverlay>\.card>\.menu-row\{grid-row:4\}/);
+  assert.match(html, /\.community-card>\.community-grid\{grid-row:4\}/);
+  assert.match(html, /\.community-card>\.community-primary\{grid-row:6\}/);
+  assert.match(html, /\.editor-tools\{grid-template-columns:repeat\(5,minmax\(44px,1fr\)\)/);
+  assert.doesNotMatch(html, /body\{padding:3px\}#app\{width:min\(100vw/);
+});
+
 test('published map metadata is locked until the layout is edited again', () => {
   assert.match(html, /function setEditorMetadataLocked\(locked\)/);
   assert.match(html, /setEditorMetadataLocked\(!!publishedDraft\)/);
