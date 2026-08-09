@@ -12,6 +12,7 @@
     "dev": "node --watch server.mjs",
     "test": "node --test --test-concurrency=1",
     "dev:web": "vite --mode web",
+    "dev:toss": "vite --mode toss-dev",
     "build:web": "vite build --mode web",
     "build:toss:dev": "node scripts/validate-toss-release.mjs --development && vite build --mode toss-dev && ait build",
     "build:toss": "node scripts/validate-toss-release.mjs && vite build --mode toss && ait build",

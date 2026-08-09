@@ -48,6 +48,7 @@ export default defineConfig(({ mode }) => {
   const env = { ...sharedTossEnv, ...loadEnv(mode, process.cwd(), '') };
   const appName = (env.TOSS_APP_NAME || PROVISIONAL_APP_NAME).trim();
   const apiBaseUrl = (env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+  const localApiProxy = (env.LOCAL_API_PROXY_URL || 'http://127.0.0.1:8787').trim();
 
   return {
     root: 'public',
@@ -56,6 +57,18 @@ export default defineConfig(({ mode }) => {
       outDir: '../dist',
       emptyOutDir: true,
       target: 'es2020',
+    },
+    server: {
+      host: '127.0.0.1',
+      port: 5173,
+      strictPort: true,
+      proxy: { '/api': localApiProxy },
+    },
+    preview: {
+      host: '127.0.0.1',
+      port: 4173,
+      strictPort: true,
+      proxy: { '/api': localApiProxy },
     },
     plugins: [
       {

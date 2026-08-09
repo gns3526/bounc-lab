@@ -61,6 +61,8 @@ npm ci
 npm run build:toss:dev
 ```
 
+로컬 Toss 화면에서 온라인 맵까지 확인하려면 API 서버(`npm start`)를 함께 실행한 뒤 `npm run dev:toss`를 사용하세요. Vite가 `/api` 요청을 기본 `http://127.0.0.1:8787`로 전달합니다.
+
 실제 제출용 빌드는 확정된 `TOSS_APP_NAME`과 공개 HTTPS `VITE_API_BASE_URL`이 없으면 중단됩니다. 콘솔 정보, 이미지 규격, 등급분류, 외부 API 배포와 QR 실기기 검증은 [TOSS_RELEASE.md](./TOSS_RELEASE.md)를 따르세요.
 
 ## 후속 접근성 과제
