@@ -15,6 +15,8 @@ const TOKEN_MIN_LENGTH = 16;
 const TOKEN_MAX_LENGTH = 256;
 const GRID_ROWS = 15;
 const GRID_COLUMNS = 20;
+const CORS_ALLOWED_METHODS = Object.freeze(['GET', 'HEAD', 'POST', 'OPTIONS']);
+const CORS_ALLOWED_HEADERS = Object.freeze(['Accept', 'Content-Type', 'X-Author-Token']);
 
 const MIME_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -41,12 +43,12 @@ class ApiError extends Error {
   }
 }
 
-function securityHeaders(contentType) {
+function securityHeaders(contentType, { crossOriginResourcePolicy = 'same-origin' } = {}) {
   return {
     'Content-Type': contentType,
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'same-origin',
-    'Cross-Origin-Resource-Policy': 'same-origin',
+    'Cross-Origin-Resource-Policy': crossOriginResourcePolicy,
     'X-Frame-Options': 'SAMEORIGIN',
   };
 }
@@ -54,7 +56,7 @@ function securityHeaders(contentType) {
 function sendJson(response, status, payload, extraHeaders = {}) {
   const body = JSON.stringify(payload);
   response.writeHead(status, {
-    ...securityHeaders('application/json; charset=utf-8'),
+    ...securityHeaders('application/json; charset=utf-8', { crossOriginResourcePolicy: 'cross-origin' }),
     'Cache-Control': 'no-store',
     'Content-Length': Buffer.byteLength(body),
     ...extraHeaders,
@@ -76,6 +78,114 @@ function safeInteger(value, fallback, min, max) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
+}
+
+function normalizeConfiguredOrigin(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error(`Invalid CORS origin: ${value}`);
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)
+    || parsed.username || parsed.password
+    || parsed.pathname !== '/' || parsed.search || parsed.hash
+    || parsed.origin === 'null') {
+    throw new Error(`CORS origin must be an http(s) origin without a path: ${value}`);
+  }
+  return parsed.origin;
+}
+
+function createAllowedOrigins({ tossAppName, configuredOrigins }) {
+  const origins = new Set();
+  if (tossAppName) {
+    const normalizedAppName = String(tossAppName).trim().toLowerCase();
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(normalizedAppName)) {
+      throw new Error('TOSS_APP_NAME must be a valid DNS label');
+    }
+    origins.add(`https://${normalizedAppName}.web.tossmini.com`);
+    origins.add(`https://${normalizedAppName}.private-web.tossmini.com`);
+  }
+
+  const entries = Array.isArray(configuredOrigins)
+    ? configuredOrigins
+    : String(configuredOrigins ?? '').split(',');
+  for (const entry of entries) {
+    const trimmed = String(entry).trim();
+    if (trimmed) origins.add(normalizeConfiguredOrigin(trimmed));
+  }
+  return origins;
+}
+
+function isLocalDevelopmentOrigin(origin) {
+  try {
+    const parsed = new URL(origin);
+    return ['http:', 'https:'].includes(parsed.protocol)
+      && ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function requestOrigin(request) {
+  const origin = request.headers.origin;
+  if (origin === undefined) return null;
+  if (Array.isArray(origin) || typeof origin !== 'string') {
+    throw new ApiError(403, 'CORS_ORIGIN_DENIED', '허용되지 않은 요청 출처입니다.');
+  }
+  try {
+    return normalizeConfiguredOrigin(origin);
+  } catch {
+    throw new ApiError(403, 'CORS_ORIGIN_DENIED', '허용되지 않은 요청 출처입니다.');
+  }
+}
+
+function appendVary(response, value) {
+  const existing = response.getHeader('Vary');
+  const values = new Set(String(existing ?? '').split(',').map((item) => item.trim()).filter(Boolean));
+  for (const item of value.split(',')) values.add(item.trim());
+  response.setHeader('Vary', [...values].join(', '));
+}
+
+function applyApiCors(request, response, { allowedOrigins, allowLocalDevelopment }) {
+  const origin = requestOrigin(request);
+  if (origin === null) return null;
+  appendVary(response, 'Origin');
+  if (!allowedOrigins.has(origin) && !(allowLocalDevelopment && isLocalDevelopmentOrigin(origin))) {
+    throw new ApiError(403, 'CORS_ORIGIN_DENIED', '허용되지 않은 요청 출처입니다.');
+  }
+  response.setHeader('Access-Control-Allow-Origin', origin);
+  return origin;
+}
+
+function handleApiPreflight(request, response) {
+  const requestedMethod = request.headers['access-control-request-method'];
+  if (Array.isArray(requestedMethod) || typeof requestedMethod !== 'string'
+    || !CORS_ALLOWED_METHODS.includes(requestedMethod.toUpperCase())) {
+    throw new ApiError(405, 'CORS_METHOD_DENIED', '허용되지 않은 CORS 요청 방식입니다.');
+  }
+
+  const requestedHeadersValue = request.headers['access-control-request-headers'];
+  if (Array.isArray(requestedHeadersValue)) {
+    throw new ApiError(400, 'CORS_HEADERS_DENIED', '허용되지 않은 CORS 요청 헤더입니다.');
+  }
+  const allowedHeaderNames = new Set(CORS_ALLOWED_HEADERS.map((name) => name.toLowerCase()));
+  const requestedHeaders = String(requestedHeadersValue ?? '')
+    .split(',').map((name) => name.trim().toLowerCase()).filter(Boolean);
+  if (requestedHeaders.some((name) => !allowedHeaderNames.has(name))) {
+    throw new ApiError(400, 'CORS_HEADERS_DENIED', '허용되지 않은 CORS 요청 헤더입니다.');
+  }
+
+  appendVary(response, 'Access-Control-Request-Method, Access-Control-Request-Headers');
+  response.writeHead(204, {
+    'Access-Control-Allow-Methods': CORS_ALLOWED_METHODS.join(', '),
+    'Access-Control-Allow-Headers': CORS_ALLOWED_HEADERS.join(', '),
+    'Access-Control-Max-Age': '600',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Length': '0',
+  });
+  response.end();
 }
 
 function sanitizeText(value, { field, maxLength, fallback = '' }) {
@@ -458,9 +568,18 @@ async function serveStatic(request, response, pathname, publicDirectory) {
 export async function createBounceServer(options = {}) {
   const moduleDirectory = dirname(fileURLToPath(import.meta.url));
   const publicDirectory = resolve(options.publicDirectory ?? resolve(moduleDirectory, 'public'));
-  const dataFile = resolve(options.dataFile ?? resolve(moduleDirectory, 'data', 'maps.json'));
+  const dataFile = resolve(options.dataFile ?? process.env.DATA_FILE ?? resolve(moduleDirectory, 'data', 'maps.json'));
   const now = options.now ?? (() => Date.now());
   const secret = options.publishSecret ?? process.env.PUBLISH_SECRET ?? randomBytes(32).toString('hex');
+  const runtimeEnvironment = options.nodeEnv ?? process.env.NODE_ENV ?? 'development';
+  const allowedOrigins = createAllowedOrigins({
+    tossAppName: options.tossAppName ?? process.env.TOSS_APP_NAME,
+    configuredOrigins: options.allowedOrigins ?? process.env.ALLOWED_ORIGINS,
+  });
+  const corsOptions = {
+    allowedOrigins,
+    allowLocalDevelopment: runtimeEnvironment !== 'production',
+  };
   const attempts = new Map();
   const store = new MapStore(dataFile);
   await store.init();
@@ -482,6 +601,11 @@ export async function createBounceServer(options = {}) {
       const currentTime = now();
 
       if (pathname.startsWith('/api/')) {
+        applyApiCors(request, response, corsOptions);
+        if (request.method === 'OPTIONS') {
+          handleApiPreflight(request, response);
+          return;
+        }
         const ip = requestIp(request);
         if (!requireRateLimit(response, generalLimiter, `all:${ip}`, currentTime)) return;
         if (request.method !== 'GET' && request.method !== 'HEAD'

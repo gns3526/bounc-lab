@@ -1,5 +1,11 @@
 node_modules/
+dist/
+*.ait
 .env
+.env.toss
+.env.toss.local
+.env.toss-dev
+.env.toss-dev.local
 coverage/
 *.log
 data/.maps-*.tmp

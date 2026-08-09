@@ -9,6 +9,10 @@ npm start
 
 기본 주소는 `http://localhost:8787`입니다. 서버는 `public/`을 정적 서비스하고 맵을 `data/maps.json`에 원자적으로 저장합니다. 운영 배포에서는 `PUBLISH_SECRET`을 반드시 고정된 비밀값으로 설정하세요. 설정하지 않으면 매 실행마다 임시 키를 만들기 때문에 재시작 전에 발급된 게시 티켓을 사용할 수 없습니다.
 
+앱인토스 운영에서는 `NODE_ENV=production`, 확정된 `TOSS_APP_NAME`, 영속 볼륨의 `DATA_FILE`을 설정합니다. 서버는 SDK 3의 `https://<appName>.web.tossmini.com`과 `https://<appName>.private-web.tossmini.com`을 자동 허용하며, 추가 Origin은 `ALLOWED_ORIGINS`에 쉼표로 구분해 넣습니다. 커스텀 작성자 헤더를 쓰므로 `OPTIONS` preflight도 처리합니다.
+
+현재 JSON 저장소와 진행 중 도전 상태는 단일 프로세스용입니다. [Dockerfile](./Dockerfile)을 사용할 때 `/data`에 영속 볼륨을 연결하고 단일 replica로 운영하세요. 다중 인스턴스나 서버리스로 확장하기 전에는 PostgreSQL 같은 공유 저장소로 이전해야 합니다.
+
 ## 맵 형식
 
 ```json

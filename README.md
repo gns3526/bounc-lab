@@ -52,6 +52,17 @@ npm test
 
 API, 정적 서비스, 요청 제한, 맵 검증, 작성자 소유권, 120Hz 결정적 클리어 리플레이, 동일 버전 게시, 1회용 티켓, 검색, 카운터, 동시 저장과 재시작 복구를 테스트합니다.
 
+## 앱인토스 빌드
+
+SDK 3 개발용 번들은 다음 명령으로 만들 수 있습니다. 결과물은 프로젝트 루트의 `bounc-lab.ait`이며, `bounc-lab`은 콘솔 등록 전 임시 `appName`입니다.
+
+```powershell
+npm ci
+npm run build:toss:dev
+```
+
+실제 제출용 빌드는 확정된 `TOSS_APP_NAME`과 공개 HTTPS `VITE_API_BASE_URL`이 없으면 중단됩니다. 콘솔 정보, 이미지 규격, 등급분류, 외부 API 배포와 QR 실기기 검증은 [TOSS_RELEASE.md](./TOSS_RELEASE.md)를 따르세요.
+
 ## 후속 접근성 과제
 
 - 모든 오버레이를 공통 modal dialog로 전환하고 초점 이동·초점 가두기·원위치 복귀·Escape 닫기를 제공합니다.
@@ -61,9 +72,13 @@ API, 정적 서비스, 요청 제한, 맵 검증, 작성자 소유권, 120Hz 결
 
 ```text
 public/index.html    게임·에디터·온라인 갤러리
+public/toss-bridge.js 앱인토스 사용자·Safe Area·공유·종료 어댑터
+apps-in-toss.config.ts SDK 3 미니앱 설정
+vite.config.mjs      웹/Toss 번들 설정
 server.mjs          정적 서버와 커뮤니티 맵 API
 physics-proof.mjs   서버 측 결정적 클리어 리플레이 검증기
 data/maps.json      게시 맵 저장소
 test/               Node 통합 테스트
 BACKEND.md          API 및 운영 문서
+TOSS_RELEASE.md      앱인토스 제출·운영 체크리스트
 ```

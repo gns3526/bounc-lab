@@ -102,6 +102,69 @@ test('health endpoint and static file serving work', async (t) => {
   assert.equal(missingApi.json.error.code, 'API_NOT_FOUND');
 });
 
+test('CORS preflight allows SDK3 Toss and explicitly configured origins', async (t) => {
+  const { baseUrl } = await startFixture(t, {
+    nodeEnv: 'production',
+    tossAppName: 'bounce-lab',
+    allowedOrigins: 'https://maps.example.com, https://ops.example.com',
+  });
+  const tossOrigin = 'https://bounce-lab.web.tossmini.com';
+  const preflight = await fetch(`${baseUrl}/api/attempts`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: tossOrigin,
+      'Access-Control-Request-Method': 'POST',
+      'Access-Control-Request-Headers': 'content-type, x-author-token',
+    },
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get('access-control-allow-origin'), tossOrigin);
+  assert.match(preflight.headers.get('access-control-allow-methods') || '', /POST/);
+  assert.match(preflight.headers.get('access-control-allow-headers') || '', /X-Author-Token/i);
+  assert.equal(preflight.headers.get('cross-origin-resource-policy'), 'cross-origin');
+  assert.match(preflight.headers.get('vary') || '', /Origin/);
+
+  const privateOrigin = 'https://bounce-lab.private-web.tossmini.com';
+  const privateHealth = await api(baseUrl, '/api/health', { headers: { Origin: privateOrigin } });
+  assert.equal(privateHealth.response.status, 200);
+  assert.equal(privateHealth.response.headers.get('access-control-allow-origin'), privateOrigin);
+  assert.equal(privateHealth.response.headers.get('cross-origin-resource-policy'), 'cross-origin');
+
+  const configuredHealth = await api(baseUrl, '/api/health', {
+    headers: { Origin: 'https://ops.example.com' },
+  });
+  assert.equal(configuredHealth.response.status, 200);
+  assert.equal(configuredHealth.response.headers.get('access-control-allow-origin'), 'https://ops.example.com');
+});
+
+test('CORS blocks untrusted origins and only allows localhost outside production', async (t) => {
+  const production = await startFixture(t, { nodeEnv: 'production', tossAppName: 'bounce-lab' });
+  const blocked = await api(production.baseUrl, '/api/health', {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://attacker.example',
+      'Access-Control-Request-Method': 'GET',
+    },
+  });
+  assert.equal(blocked.response.status, 403);
+  assert.equal(blocked.json.error.code, 'CORS_ORIGIN_DENIED');
+  assert.equal(blocked.response.headers.get('access-control-allow-origin'), null);
+  assert.equal(blocked.response.headers.get('cross-origin-resource-policy'), 'cross-origin');
+
+  const productionLocal = await api(production.baseUrl, '/api/health', {
+    headers: { Origin: 'http://localhost:5173' },
+  });
+  assert.equal(productionLocal.response.status, 403);
+  assert.equal(productionLocal.json.error.code, 'CORS_ORIGIN_DENIED');
+
+  const development = await startFixture(t, { nodeEnv: 'development' });
+  const developmentLocal = await api(development.baseUrl, '/api/health', {
+    headers: { Origin: 'http://localhost:5173' },
+  });
+  assert.equal(developmentLocal.response.status, 200);
+  assert.equal(developmentLocal.response.headers.get('access-control-allow-origin'), 'http://localhost:5173');
+});
+
 test('API rate limiting returns a retry hint', async (t) => {
   const { baseUrl } = await startFixture(t, { generalRateLimit: 1 });
   const first = await api(baseUrl, '/api/health');
@@ -218,7 +281,9 @@ test('only the same owner can complete an attempt and publish its exact map once
   assert.equal(reuse.response.status, 409);
   assert.equal(reuse.json.error.code, 'PUBLISH_TICKET_USED');
 
-  const tamperedTicket = `${completion.json.publishTicket.slice(0, -1)}x`;
+  const [ticketPayload, ticketSignature] = completion.json.publishTicket.split('.');
+  const tamperedSignature = `${ticketSignature[0] === 'x' ? 'y' : 'x'}${ticketSignature.slice(1)}`;
+  const tamperedTicket = `${ticketPayload}.${tamperedSignature}`;
   const tampered = await api(baseUrl, '/api/maps', {
     method: 'POST',
     token: OWNER_TOKEN,

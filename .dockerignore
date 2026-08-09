@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+dist
+*.ait
+.env
+.env.*
+!.env.toss.example
+coverage
+data
+release-assets
+test
+*.log

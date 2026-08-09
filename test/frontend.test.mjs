@@ -70,7 +70,8 @@ test('game shortcuts preserve native input and control keyboard behavior', () =>
 
 test('mobile editor keeps essential controls readable and accessible', () => {
   const viewport = html.match(/<meta name="viewport" content="([^"]+)"/i)?.[1] || '';
-  assert.doesNotMatch(viewport, /maximum-scale|user-scalable/);
+  assert.match(viewport, /maximum-scale=1/);
+  assert.match(viewport, /user-scalable=no/);
   assert.match(html, /class="publish-label"><span>맵 제목<\/span>/);
   assert.match(html, /id="editorStatus" role="status" aria-live="polite"/);
   assert.match(html, /id="verificationBadge" role="status" aria-live="polite"/);
@@ -81,6 +82,18 @@ test('mobile editor keeps essential controls readable and accessible', () => {
   assert.match(html, /\.editor-tool\{min-width:44px;min-height:44px/);
   assert.match(html, /\.toast-inline\{position:absolute;z-index:120/);
   assert.match(html, /env\(safe-area-inset-bottom\)/);
+});
+
+test('Apps in Toss hooks cover identity, sharing, safe layout, and confirmed exit', () => {
+  assert.match(html, /meta name="api-base-url"/);
+  assert.match(html, /html\.toss-miniapp #app/);
+  assert.match(html, /--toss-safe-top/);
+  assert.match(html, /addEventListener\('bounc:toss-ready'/);
+  assert.match(html, /window\.__BOUNC_TOSS__\?\.shareMap/);
+  assert.match(html, /addEventListener\('bounc:toss-back',openExitDialog\)/);
+  assert.match(html, /id="exitOverlay" role="dialog" aria-modal="true"/);
+  assert.match(html, /document\.hidden/);
+  assert.match(html, /SFX\.stopContinuous\(\)/);
 });
 
 test('mobile viewport stays contained and anchors long overlays', () => {

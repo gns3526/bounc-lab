@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="api-base-url" content="" />
   <meta name="theme-color" content="#dff7ff" />
   <title>BOUNC LAB — 만들고, 깨고, 공유하는 펭귄 바운스</title>
   <style>
@@ -20,6 +21,10 @@
       --viewport-h:100dvh;
       --viewport-x:0px;
       --viewport-y:0px;
+      --toss-safe-top:env(safe-area-inset-top,0px);
+      --toss-safe-right:env(safe-area-inset-right,0px);
+      --toss-safe-bottom:env(safe-area-inset-bottom,0px);
+      --toss-safe-left:env(safe-area-inset-left,0px);
     }
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     html,body{margin:0;width:100%;height:100%;min-height:0;overflow:hidden;overscroll-behavior:none}
@@ -498,6 +503,53 @@
       .pill{padding-inline:4px}
       .start-card{padding:9px}
     }
+
+    /* Apps in Toss: the WebView itself is the game surface. */
+    html.toss-miniapp,html.toss-miniapp body{
+      width:100%;height:100%;min-height:100%;overflow:hidden;background:#76c9f5;
+    }
+    html.toss-miniapp body{
+      display:block;padding:0;overscroll-behavior:none;
+    }
+    html.toss-miniapp #app{
+      width:100%!important;height:100%!important;max-width:none!important;aspect-ratio:auto!important;
+    }
+    html.toss-miniapp .game-wrap{
+      width:100%;height:100%;border:0;border-radius:0;box-shadow:none;
+      background:
+        radial-gradient(circle at 15% 16%,rgba(255,255,255,.65) 0 2%,transparent 2.2%),
+        linear-gradient(#76c9f5 0%,#c9efff 64%,#eafaff 100%);
+    }
+    html.toss-miniapp #game{
+      left:50%;right:auto;top:50%;bottom:auto;
+      width:min(100%,calc(100dvh * 4 / 3));height:auto;aspect-ratio:4/3;
+      transform:translate(-50%,-50%);
+    }
+    html.toss-miniapp .hud{
+      left:max(6px,calc(var(--toss-safe-left) + 6px));
+      right:max(68px,calc(var(--toss-safe-right) + 68px));
+      top:max(6px,calc(var(--toss-safe-top) + 6px));
+    }
+    html.toss-miniapp .controls{
+      left:max(6px,calc(var(--toss-safe-left) + 6px));
+      right:max(6px,calc(var(--toss-safe-right) + 6px));
+      bottom:max(6px,calc(var(--toss-safe-bottom) + 6px));
+    }
+    html.toss-miniapp .tip{
+      left:max(12px,calc(var(--toss-safe-left) + 12px));
+      bottom:max(72px,calc(var(--toss-safe-bottom) + 72px));
+    }
+    html.toss-miniapp .overlay{
+      left:0;top:0;width:100%;height:100%;
+      padding:
+        max(8px,calc(var(--toss-safe-top) + 8px))
+        max(8px,calc(var(--toss-safe-right) + 8px))
+        max(8px,calc(var(--toss-safe-bottom) + 8px))
+        max(8px,calc(var(--toss-safe-left) + 8px));
+    }
+    html.toss-miniapp .toast-inline{
+      bottom:max(14px,calc(var(--toss-safe-bottom) + 14px));
+    }
   </style>
 </head>
 <body>
@@ -667,6 +719,16 @@
         </div>
         <p class="sub">펭귄은 바닥에 닿을 때마다 <b>항상 같은 점프력</b>으로 자동 반동합니다. 클리어하면 결과창 없이 다음 스테이지로 바로 이어집니다. 조작은 수평 이동만 담당하며 위·아래 입력이나 점프 버튼은 없습니다. 벽에 닿았을 때 <b>벽의 반대 방향</b>을 누르면 위로 크게 퐁 튀어 오릅니다.</p>
         <div class="menu-row"><button class="menu-btn primary" id="helpCloseBtn">확인</button></div>
+      </div>
+    </section>
+    <section class="overlay hidden" id="exitOverlay" role="dialog" aria-modal="true" aria-labelledby="exitTitle">
+      <div class="card">
+        <h2 id="exitTitle">게임을 종료할까요?</h2>
+        <p class="sub">진행 상황은 자동으로 저장됩니다. 계속 플레이하거나 토스로 돌아갈 수 있어요.</p>
+        <div class="menu-row">
+          <button class="menu-btn" id="exitCancelBtn">계속 플레이</button>
+          <button class="menu-btn danger" id="exitConfirmBtn">게임 종료</button>
+        </div>
       </div>
     </section>
     <div class="joystick-wrap" id="joystickLayer" aria-hidden="true">
@@ -2246,7 +2308,7 @@
     stageText:$('stageText'), boundText:$('boundText'), scoreText:$('scoreText'),
     joystickModeBtn:$('joystickModeBtn'), touchModeBtn:$('touchModeBtn'),
     soundBtn:$('soundBtn'), restartBtn:$('restartBtn'), pauseBtn:$('pauseBtn'),
-    startOverlay:$('startOverlay'), pauseOverlay:$('pauseOverlay'), clearOverlay:$('clearOverlay'), selectOverlay:$('selectOverlay'), helpOverlay:$('helpOverlay'), editorOverlay:$('editorOverlay'), communityOverlay:$('communityOverlay'),
+    startOverlay:$('startOverlay'), pauseOverlay:$('pauseOverlay'), clearOverlay:$('clearOverlay'), selectOverlay:$('selectOverlay'), helpOverlay:$('helpOverlay'), editorOverlay:$('editorOverlay'), communityOverlay:$('communityOverlay'), exitOverlay:$('exitOverlay'),
     stageToast:$('stageToast'), tip:$('tip'), levelGrid:$('levelGrid'),
     mapEditorBtn:$('mapEditorBtn'), customPlayBtn:$('customPlayBtn'), pauseEditorBtn:$('pauseEditorBtn'),
     editorCanvas:$('editorCanvas'), editorStatus:$('editorStatus'), editorTools:$('editorTools'),
@@ -2307,7 +2369,7 @@
   let draftSaveTimer=0;
   let verificationPromise=null;
   let toastTimer=0;
-  const ownerToken=(()=>{
+  let ownerToken=(()=>{
     let value=safeStore.get(OWNER_TOKEN_KEY,'');
     if(!value){
       const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);
@@ -2316,8 +2378,30 @@
     }
     return value;
   })();
+  async function applyTossIdentity(detail={}){
+    const hash=String(detail.userHash||detail.hash||'').trim();
+    if(hash){
+      try{
+        const inputBytes=new TextEncoder().encode(`bounc-owner-v1\0${hash}`);
+        const digest=await crypto.subtle.digest('SHA-256',inputBytes);
+        ownerToken=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+        safeStore.set(OWNER_TOKEN_KEY,ownerToken);
+      }catch(_){
+        ownerToken=hash.slice(0,256);
+      }
+    }
+    const profileName=cleanText(detail.profileName||detail.nickname,20);
+    if(profileName&&!safeStore.get(AUTHOR_NAME_KEY,'')){
+      safeStore.set(AUTHOR_NAME_KEY,profileName);
+      if(ui.authorNameInput&&!ui.authorNameInput.value)ui.authorNameInput.value=profileName;
+    }
+  }
+  addEventListener('bounc:toss-ready',event=>applyTossIdentity(event.detail));
   let state = 'menu';
   let paused = false;
+  let exitReturnOverlay='startOverlay';
+  let exitReturnState='menu';
+  let exitReturnPaused=false;
   let muted = safeStore.get('penguinBoundMutedSoundpackV2','0') === '1';
   let controlMode = safeStore.get('penguinBoundControlMode','joystick') === 'touch' ? 'touch' : 'joystick';
   let accumulator = 0;
@@ -2677,7 +2761,7 @@
   };
 
   function setOverlay(name) {
-    [ui.startOverlay,ui.pauseOverlay,ui.clearOverlay,ui.selectOverlay,ui.helpOverlay,ui.editorOverlay,ui.communityOverlay].forEach(el=>el.classList.add('hidden'));
+    [ui.startOverlay,ui.pauseOverlay,ui.clearOverlay,ui.selectOverlay,ui.helpOverlay,ui.editorOverlay,ui.communityOverlay,ui.exitOverlay].forEach(el=>el.classList.add('hidden'));
     if (name) ui[name].classList.remove('hidden');
   }
 
@@ -2717,11 +2801,13 @@
     return JSON.stringify({version:1,grid:map.grid,spawn:map.spawn,exitRow:map.exitRow});
   }
 
+  const apiBase=(document.querySelector('meta[name="api-base-url"]')?.content||'').trim().replace(/\/+$/,'');
+
   async function apiRequest(path,{method='GET',body,signal}={}){
     const options={method,signal,headers:{Accept:'application/json','X-Author-Token':ownerToken}};
     if(body!==undefined){options.headers['Content-Type']='application/json';options.body=JSON.stringify(body);}
     let response;
-    try{response=await fetch(`/api${path}`,options);}catch(_){throw new Error('온라인 서버에 연결할 수 없습니다. npm start로 서버를 실행했는지 확인해주세요.');}
+    try{response=await fetch(`${apiBase}/api${path}`,options);}catch(_){throw new Error('온라인 맵 서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.');}
     let data={};try{data=await response.json();}catch(_){}
     if(!response.ok||data.ok===false){
       const message=data?.error?.message||data?.message||data?.error||`온라인 요청 실패 (${response.status})`;
@@ -2912,6 +2998,10 @@
     const url=new URL(location.href);url.search='';url.searchParams.set('map',item.id);url.hash='';
     const shareData={title:`${item.title||'BOUNC LAB 맵'} · BOUNC LAB`,text:`${item.authorName||item.author||'펭귄'} 제작 맵에 도전해보세요!`,url:url.href};
     try{
+      if(window.__BOUNC_TOSS__?.shareMap){
+        await window.__BOUNC_TOSS__.shareMap(item.id,shareData.title,shareData.text);
+        return;
+      }
       if(navigator.share){await navigator.share(shareData);return;}
       await navigator.clipboard.writeText(url.href);showAppToast('공유 링크를 복사했습니다');
     }catch(error){if(error?.name!=='AbortError')showAppToast('링크를 복사하지 못했습니다');}
@@ -3773,6 +3863,27 @@
     lastTime=performance.now();updateControlModeUI();
   }
 
+  function openExitDialog(){
+    if(!ui.exitOverlay.classList.contains('hidden'))return;
+    exitReturnOverlay=['startOverlay','pauseOverlay','clearOverlay','selectOverlay','helpOverlay','editorOverlay','communityOverlay']
+      .find(name=>!ui[name].classList.contains('hidden'))||null;
+    exitReturnState=state;
+    exitReturnPaused=paused;
+    releasePointerControl();
+    SFX.stopContinuous();
+    if(state==='playing')paused=true;
+    setOverlay('exitOverlay');
+  }
+
+  function cancelExitDialog(){
+    state=exitReturnState;
+    paused=exitReturnPaused;
+    setOverlay(exitReturnOverlay);
+    if(state==='playing'&&!paused&&arrowDriveActive)SFX.resumeArrow(arrowDir);
+    lastTime=performance.now();
+    updateControlModeUI();
+  }
+
   const joystickEl=$('joystick');
   const joystickKnob=$('joystickKnob');
   const controlsEl=$('controls');
@@ -3911,7 +4022,17 @@
   addEventListener('pointerdown',()=>SFX.unlock(),{capture:true,passive:true});
   addEventListener('keydown',()=>SFX.unlock(),{capture:true});
   addEventListener('pageshow',()=>{if(!muted)SFX.unlock();});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!muted)SFX.unlock();});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){
+      input.keyLeft=input.keyRight=false;
+      releasePointerControl();
+      SFX.stopContinuous();
+      if(state==='playing'&&!paused)togglePause(true,true);
+      return;
+    }
+    if(!muted)SFX.unlock();
+  });
+  addEventListener('bounc:toss-back',openExitDialog);
 
   gameWrap.addEventListener('pointerdown',beginPointerControl,{passive:false});
   gameWrap.addEventListener('pointermove',movePointerControl,{passive:false});
@@ -4014,6 +4135,14 @@
   ui.touchModeBtn.onclick=()=>setControlMode('touch');
   $('controlModeSelect').onchange=e=>setControlMode(e.target.value);
   $('pauseSoundBtn').onclick=()=>ui.soundBtn.click();
+  $('exitCancelBtn').onclick=()=>{SFX.ui();cancelExitDialog();};
+  $('exitConfirmBtn').onclick=async event=>{
+    const button=event.currentTarget;
+    const close=window.__BOUNC_TOSS__?.close||window.__BOUNC_TOSS__?.closeView;
+    if(!close){showAppToast('토스에서 실행할 때 종료할 수 있어요');cancelExitDialog();return;}
+    button.disabled=true;
+    try{await close();}catch(_){button.disabled=false;showAppToast('잠시 후 다시 시도해주세요');}
+  };
 
   function buildLevelGrid(){
     ui.levelGrid.innerHTML='';
