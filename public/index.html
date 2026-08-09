@@ -265,6 +265,9 @@
     .publish-field{width:100%;height:32px;padding:0 8px;border:2px solid #b6dcec;border-radius:9px;background:#fff;color:#173458;font:850 10px inherit;outline:none}
     .publish-field:focus{border-color:#4da7f7;box-shadow:0 0 0 3px rgba(77,167,247,.15)}
     .publish-field[readonly]{background:#edf4f8;color:#60788f;cursor:not-allowed}
+    .community-consent{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:start;padding:6px 7px;border:1px solid #b9def1;border-radius:9px;background:#f5fbff;color:#496d8f;font-size:8px;font-weight:850;line-height:1.35}
+    .community-consent input{width:16px;height:16px;margin:0;accent-color:#24866c}
+    .community-consent a,.community-policy-links a{color:#1767a8;text-decoration:underline;text-underline-offset:2px}
     .verification-badge{padding:7px 8px;border:2px solid #b9def1;border-radius:10px;background:#effaff;color:#315c88;font-size:9px;font-weight:900;line-height:1.35}
     .verification-badge.verifying{border-color:#e0a42e;background:#fff8dc;color:#7c5200}
     .verification-badge.verified{border-color:#3a9b83;background:#effff8;color:#246c5e}
@@ -289,12 +292,22 @@
     .community-selected.show{display:flex;align-items:center;justify-content:space-between;gap:10px}
     .community-selected b{display:block;font-size:13px}.community-selected span{display:block;margin-top:2px;color:#5a7794;font-size:9px;font-weight:850}
     .share-btn{width:38px;height:38px;flex:0 0 auto;border:2px solid #397ab6;border-radius:11px;background:#fff;font-size:17px}
+    .community-safety-actions{display:none;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:7px}
+    .community-safety-actions.show{display:grid}
+    .community-safety-actions button,.community-reset-hidden{min-height:34px;padding:5px 6px;border:1px solid #8fbfdc;border-radius:9px;background:#fff;color:#315c88;font-size:9px;font-weight:900}
+    .community-safety-actions button.danger{border-color:#df9bab;background:#fff2f5;color:#99445a}
+    .community-policy-links{margin-top:8px;color:#6685a0;text-align:center;font-size:9px;font-weight:800}
+    .report-card{width:min(520px,96%);text-align:left}
+    .report-fields{display:grid;gap:9px;margin:14px 0}
+    .report-fields label{display:grid;gap:4px;color:#315c88;font-size:11px;font-weight:900}
+    .report-fields select,.report-fields textarea{width:100%;border:2px solid #9bcce7;border-radius:11px;background:#fff;color:#173458;padding:9px;font:850 14px inherit;outline:none}
+    .report-fields textarea{min-height:84px;resize:vertical}
     .community-primary{width:100%;margin-top:9px}
     .empty-state{grid-column:1/-1;display:grid;place-items:center;min-height:110px;padding:18px;border:2px dashed #b9def1;border-radius:14px;color:#6685a0;text-align:center;font-size:11px;font-weight:900;line-height:1.5}
     .toast-inline{position:absolute;z-index:120;left:50%;bottom:14px;max-width:86%;padding:9px 13px;border-radius:12px;background:#173458;color:white;font-size:11px;font-weight:900;opacity:0;pointer-events:none;transform:translate(-50%,8px);transition:.2s}
     .toast-inline.show{opacity:1;transform:translate(-50%,0)}
     @media(max-width:620px){
-      .hud-brand{font-size:9px;letter-spacing:.08em}.start-actions{grid-template-columns:1fr}.start-actions .menu-btn{min-height:48px}.community-card{padding:10px}.community-grid{grid-template-columns:repeat(2,1fr)}.community-toolbar{grid-template-columns:1fr 104px}.map-card{min-height:92px}.verification-badge{font-size:10px}.publish-label{font-size:11px}.publish-field,.community-toolbar input,.community-toolbar select,.setting-row select{height:44px;min-height:44px;font-size:16px}.editor-close,.share-btn{width:44px;height:44px}#pauseBtn{min-width:44px;height:44px}.editor-tool{min-height:44px;font-size:10px}.editor-action.primary{min-height:44px}.editor-more summary{display:flex;align-items:center;min-height:44px;padding:8px}.editor-more summary::after{margin-left:auto}
+      .hud-brand{font-size:9px;letter-spacing:.08em}.start-actions{grid-template-columns:1fr}.start-actions .menu-btn{min-height:48px}.community-card{padding:10px}.community-grid{grid-template-columns:repeat(2,1fr)}.community-toolbar{grid-template-columns:1fr 104px}.map-card{min-height:92px}.verification-badge{font-size:10px}.publish-label{font-size:11px}.publish-field,.community-toolbar input,.community-toolbar select,.setting-row select{height:44px;min-height:44px;font-size:16px}.community-consent{font-size:10px}.community-safety-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.community-safety-actions button,.community-reset-hidden{min-height:44px;font-size:11px}.editor-close,.share-btn{width:44px;height:44px}#pauseBtn{min-width:44px;height:44px}.editor-tool{min-height:44px;font-size:10px}.editor-action.primary{min-height:44px}.editor-more summary{display:flex;align-items:center;min-height:44px;padding:8px}.editor-more summary::after{margin-left:auto}
     }
     @media(max-width:620px) and (orientation:portrait){
       .overlay{position:fixed;inset:0;z-index:80;padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));background:rgba(19,57,94,.38)}
@@ -671,6 +684,7 @@
               <label class="publish-label"><span>맵 제목</span><input class="publish-field" id="mapTitleInput" maxlength="40" autocomplete="off" placeholder="예: 얼음 절벽"></label>
               <label class="publish-label"><span>제작자 이름</span><input class="publish-field" id="authorNameInput" maxlength="20" autocomplete="nickname" placeholder="예: 펭귄 장인"></label>
             </div>
+            <label class="community-consent"><input type="checkbox" id="communityTermsCheck"><span><a href="./community-guidelines.html" target="_blank" rel="noopener">커뮤니티 이용규칙</a>과 <a href="./terms.html" target="_blank" rel="noopener">이용약관</a>에 동의하며, 개인정보·욕설·불법 콘텐츠를 게시하지 않겠습니다.</span></label>
             <div class="verification-badge" id="verificationBadge" role="status" aria-live="polite" aria-atomic="true">이 버전을 직접 클리어하면 온라인 게시가 열립니다.</div>
             <div class="editor-actions">
               <details class="editor-more">
@@ -700,9 +714,30 @@
           <select id="communitySort" aria-label="온라인 맵 정렬"><option value="newest">최신순</option><option value="popular">인기순</option><option value="clears">클리어순</option></select>
         </div>
         <div class="community-status" id="communityStatus" role="status" aria-live="polite" aria-atomic="true">온라인 맵을 불러오는 중…</div>
+        <button class="community-reset-hidden" id="communityResetHiddenBtn" type="button">숨긴 맵·제작자 다시 보기</button>
         <div class="community-grid" id="communityGrid"></div>
         <div class="community-selected" id="communitySelected"><div><b id="selectedMapTitle">맵을 선택하세요</b><span id="selectedMapMeta"></span></div><button class="share-btn" id="communityShareBtn" aria-label="선택한 맵 공유">↗</button></div>
+        <div class="community-safety-actions" id="communitySafetyActions">
+          <button id="communityHideMapBtn" type="button">이 맵 숨기기</button>
+          <button id="communityHideAuthorBtn" type="button">제작자 숨기기</button>
+          <button class="danger" id="communityReportBtn" type="button">신고하기</button>
+          <button class="danger" id="communityDeleteBtn" type="button" hidden>내 맵 삭제</button>
+        </div>
         <button class="menu-btn primary community-primary" id="communityPrimaryBtn" disabled>플레이할 맵을 선택하세요</button>
+        <div class="community-policy-links"><a href="./community-guidelines.html" target="_blank" rel="noopener">커뮤니티 이용규칙</a> · <a href="./privacy.html" target="_blank" rel="noopener">개인정보처리방침</a></div>
+      </div>
+    </section>
+
+    <section class="overlay hidden" id="reportOverlay" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+      <div class="card report-card">
+        <h2 id="reportTitle">온라인 맵 신고</h2>
+        <p class="sub">신고는 운영자 검토에 사용됩니다. 설명에 개인정보를 적지 마세요.</p>
+        <div class="report-fields">
+          <label>신고 대상<select id="reportScope"><option value="map">이 맵</option><option value="author">이 제작자</option></select></label>
+          <label>신고 사유<select id="reportReason"><option value="abuse">욕설·괴롭힘</option><option value="hate">혐오 표현</option><option value="sexual">성적·유해 콘텐츠</option><option value="violence">과도한 폭력 표현</option><option value="personal_info">개인정보 노출</option><option value="spam">스팸·도배</option><option value="illegal">불법·위험 행위</option><option value="copyright">권리 침해</option><option value="other">기타</option></select></label>
+          <label>설명(선택)<textarea id="reportDetail" maxlength="240" placeholder="운영자가 확인할 내용을 240자 이내로 적어주세요."></textarea></label>
+        </div>
+        <div class="menu-row"><button class="menu-btn" id="reportCancelBtn" type="button">취소</button><button class="menu-btn danger" id="reportSubmitBtn" type="button">신고 보내기</button></div>
       </div>
     </section>
 
@@ -2308,12 +2343,12 @@
     stageText:$('stageText'), boundText:$('boundText'), scoreText:$('scoreText'),
     joystickModeBtn:$('joystickModeBtn'), touchModeBtn:$('touchModeBtn'),
     soundBtn:$('soundBtn'), restartBtn:$('restartBtn'), pauseBtn:$('pauseBtn'), bgmAudio:$('bgmAudio'),
-    startOverlay:$('startOverlay'), pauseOverlay:$('pauseOverlay'), clearOverlay:$('clearOverlay'), selectOverlay:$('selectOverlay'), helpOverlay:$('helpOverlay'), editorOverlay:$('editorOverlay'), communityOverlay:$('communityOverlay'), exitOverlay:$('exitOverlay'),
+    startOverlay:$('startOverlay'), pauseOverlay:$('pauseOverlay'), clearOverlay:$('clearOverlay'), selectOverlay:$('selectOverlay'), helpOverlay:$('helpOverlay'), editorOverlay:$('editorOverlay'), communityOverlay:$('communityOverlay'), reportOverlay:$('reportOverlay'), exitOverlay:$('exitOverlay'),
     stageToast:$('stageToast'), tip:$('tip'), levelGrid:$('levelGrid'),
     mapEditorBtn:$('mapEditorBtn'), customPlayBtn:$('customPlayBtn'), pauseEditorBtn:$('pauseEditorBtn'),
     editorCanvas:$('editorCanvas'), editorStatus:$('editorStatus'), editorTools:$('editorTools'),
-    verificationBadge:$('verificationBadge'), mapTitleInput:$('mapTitleInput'), authorNameInput:$('authorNameInput'),
-    communityGrid:$('communityGrid'), communityStatus:$('communityStatus'), communitySelected:$('communitySelected'),
+    verificationBadge:$('verificationBadge'), mapTitleInput:$('mapTitleInput'), authorNameInput:$('authorNameInput'), communityTermsCheck:$('communityTermsCheck'),
+    communityGrid:$('communityGrid'), communityStatus:$('communityStatus'), communitySelected:$('communitySelected'), communitySafetyActions:$('communitySafetyActions'),
     touchZones:$('touchZones'), touchLeftZone:$('touchLeftZone'), touchRightZone:$('touchRightZone')
   };
 
@@ -2358,6 +2393,21 @@
   const OWNER_TOKEN_KEY='penguinBoundOwnerTokenV1';
   const AUTHOR_NAME_KEY='penguinBoundAuthorNameV1';
   const MAP_TITLE_KEY='penguinBoundMapTitleV1';
+  const COMMUNITY_TERMS_VERSION='2026-08-10-v1';
+  const COMMUNITY_TERMS_KEY='penguinBoundCommunityTermsV1';
+  const BLOCKED_MAPS_KEY='penguinBoundBlockedMapsV1';
+  const BLOCKED_AUTHORS_KEY='penguinBoundBlockedAuthorsV1';
+  const OWN_MAP_IDS_KEY='penguinBoundOwnMapIdsV1';
+  function readStringSet(key){
+    try{
+      const values=JSON.parse(safeStore.get(key,'[]'));
+      return new Set(Array.isArray(values)?values.filter(value=>typeof value==='string'&&value):[]);
+    }catch(_){return new Set();}
+  }
+  function writeStringSet(key,values){safeStore.set(key,JSON.stringify([...values]));}
+  let blockedMapIds=readStringSet(BLOCKED_MAPS_KEY);
+  let blockedAuthorIds=readStringSet(BLOCKED_AUTHORS_KEY);
+  let ownedMapIds=readStringSet(OWN_MAP_IDS_KEY);
   let playContext='official';
   let communityMaps=[];
   let selectedCommunityMap=null;
@@ -2369,6 +2419,7 @@
   let draftSaveTimer=0;
   let verificationPromise=null;
   let toastTimer=0;
+  ui.communityTermsCheck.checked=safeStore.get(COMMUNITY_TERMS_KEY,'')===COMMUNITY_TERMS_VERSION;
   let ownerToken=(()=>{
     let value=safeStore.get(OWNER_TOKEN_KEY,'');
     if(!value){
@@ -2840,7 +2891,7 @@
   };
 
   function setOverlay(name) {
-    [ui.startOverlay,ui.pauseOverlay,ui.clearOverlay,ui.selectOverlay,ui.helpOverlay,ui.editorOverlay,ui.communityOverlay,ui.exitOverlay].forEach(el=>el.classList.add('hidden'));
+    [ui.startOverlay,ui.pauseOverlay,ui.clearOverlay,ui.selectOverlay,ui.helpOverlay,ui.editorOverlay,ui.communityOverlay,ui.reportOverlay,ui.exitOverlay].forEach(el=>el.classList.add('hidden'));
     if (name) ui[name].classList.remove('hidden');
   }
 
@@ -2959,8 +3010,10 @@
 
   const apiBase=(document.querySelector('meta[name="api-base-url"]')?.content||'').trim().replace(/\/+$/,'');
 
-  async function apiRequest(path,{method='GET',body,signal}={}){
-    const options={method,signal,headers:{Accept:'application/json','X-Author-Token':ownerToken}};
+  async function apiRequest(path,{method='GET',body,signal,auth=false}={}){
+    const headers={Accept:'application/json'};
+    if(auth)headers['X-Author-Token']=ownerToken;
+    const options={method,signal,headers};
     if(body!==undefined){options.headers['Content-Type']='application/json';options.body=JSON.stringify(body);}
     let response;
     try{response=await fetch(`${apiBase}/api${path}`,options);}catch(_){throw new Error('온라인 맵 서버에 연결할 수 없습니다. 네트워크 상태를 확인해주세요.');}
@@ -3041,7 +3094,7 @@
     try{
       const saved=JSON.parse(safeStore.get(VERIFICATION_KEY,''));
       if(saved&&saved.mapSignature===mapSignature(editorSnapshot())){
-        if(saved.published?.id)publishedDraft=saved.published;
+        if(saved.published?.id){publishedDraft=saved.published;ownedMapIds.add(saved.published.id);writeStringSet(OWN_MAP_IDS_KEY,ownedMapIds);}
         else if(saved.publishTicket&&(!saved.expiresAt||Date.parse(saved.expiresAt)>Date.now()))verifiedDraft=saved;
       }
     }catch(_){}
@@ -3088,7 +3141,7 @@
     updateVerificationUI('검증 플레이를 준비하고 있어요…');
     $('editorTestBtn').disabled=true;
     try{
-      const result=await apiRequest('/attempts',{method:'POST',body:{map,authorToken:ownerToken}});
+      const result=await apiRequest('/attempts',{method:'POST',auth:true,body:{map,authorToken:ownerToken}});
       if(editorRevision!==revision||mapSignature(editorSnapshot())!==mapSignature(map))throw new Error('준비 중 맵이 바뀌었습니다. 현재 버전으로 다시 검증해주세요.');
       activeAttempt={id:result.attemptId||result.attempt?.id,mapHash:result.mapHash||result.attempt?.mapHash||'',mapSignature:mapSignature(map),revision,map};
       if(!activeAttempt.id)throw new Error('서버가 검증 번호를 만들지 못했습니다.');
@@ -3108,7 +3161,7 @@
     if(!replay){activeAttempt=null;updateVerificationUI('플레이 기록을 확인할 수 없습니다. 다시 검증해주세요.');return null;}
     updateVerificationUI('클리어 확인을 서버에 저장하고 있어요…');
     try{
-      const result=await apiRequest(`/attempts/${encodeURIComponent(attempt.id)}/complete`,{method:'POST',body:{authorToken:ownerToken,clearStats,replay}});
+      const result=await apiRequest(`/attempts/${encodeURIComponent(attempt.id)}/complete`,{method:'POST',auth:true,body:{authorToken:ownerToken,clearStats,replay}});
       if(editorRevision!==attempt.revision||mapSignature(editorSnapshot())!==attempt.mapSignature)return null;
       const publishTicket=result.publishTicket||result.ticket;
       if(!publishTicket)throw new Error('게시 인증표를 받지 못했습니다.');
@@ -3128,14 +3181,21 @@
     const title=cleanText(ui.mapTitleInput.value,40);
     const authorName=cleanText(ui.authorNameInput.value,20);
     if(!title||!authorName){setEditorStatus('맵 제목과 제작자 이름을 모두 입력해주세요.','error');return;}
+    if(!ui.communityTermsCheck.checked){
+      setEditorStatus('온라인 게시 전에 커뮤니티 이용규칙과 이용약관에 동의해주세요.','error');
+      ui.communityTermsCheck.focus();
+      return;
+    }
     const map=editorSnapshot();
     if(mapSignature(map)!==verifiedDraft.mapSignature){invalidateVerification();return;}
     const button=$('editorTestBtn');button.disabled=true;button.textContent='게시 중…';
     try{
-      const result=await apiRequest('/maps',{method:'POST',body:{map,title,authorName,author:authorName,publishTicket:verifiedDraft.publishTicket,authorToken:ownerToken}});
+      const result=await apiRequest('/maps',{method:'POST',auth:true,body:{map,title,authorName,author:authorName,publishTicket:verifiedDraft.publishTicket,authorToken:ownerToken,termsVersion:COMMUNITY_TERMS_VERSION}});
       const item=result.map||result.item||result;
       if(!item.id)throw new Error('게시된 맵 번호를 받지 못했습니다.');
       publishedDraft={...item,id:item.id,title:item.title||title,authorName:item.authorName||item.author||authorName};
+      ownedMapIds.add(item.id);writeStringSet(OWN_MAP_IDS_KEY,ownedMapIds);
+      safeStore.set(COMMUNITY_TERMS_KEY,COMMUNITY_TERMS_VERSION);
       safeStore.set(VERIFICATION_KEY,JSON.stringify({mapSignature:verifiedDraft.mapSignature,published:publishedDraft}));
       updateVerificationUI();setEditorStatus('온라인 게시 완료! 공유 버튼으로 링크를 보낼 수 있어요.','ok');
       showAppToast('맵을 온라인에 게시했습니다 ✓');
@@ -3165,10 +3225,19 @@
 
   function mapListFromResponse(result){return Array.isArray(result)?result:(result.maps||result.items||result.data||[]);}
 
+  function isCommunityItemHidden(item){
+    return !!item&&(blockedMapIds.has(item.id)||!!item.authorId&&blockedAuthorIds.has(item.authorId));
+  }
+
+  function updateCommunityHiddenControls(){
+    $('communityResetHiddenBtn').hidden=blockedMapIds.size===0&&blockedAuthorIds.size===0;
+  }
+
   function renderCommunityMaps(){
     const list=communityMaps;
     ui.communityGrid.innerHTML='';
-    if(!list.length){const empty=document.createElement('div');empty.className='empty-state';empty.textContent='아직 게시된 맵이 없어요. 첫 번째 맵을 만들어 직접 클리어해보세요!';ui.communityGrid.appendChild(empty);return;}
+    updateCommunityHiddenControls();
+    if(!list.length){const empty=document.createElement('div');empty.className='empty-state';empty.textContent=blockedMapIds.size||blockedAuthorIds.size?'표시할 맵이 없어요. 숨긴 항목을 다시 보거나 새 맵을 찾아보세요.':'아직 게시된 맵이 없어요. 첫 번째 맵을 만들어 직접 클리어해보세요!';ui.communityGrid.appendChild(empty);return;}
     for(const item of list){
       const card=document.createElement('button');card.type='button';card.className='map-card'+(selectedCommunityMap?.id===item.id?' selected':'');
       const title=document.createElement('span');title.className='map-title';title.textContent=item.title||'이름 없는 맵';
@@ -3186,16 +3255,21 @@
   function showSelectedCommunityMap(item){
     selectedCommunityMap=item;renderCommunityMaps();
     ui.communitySelected.classList.toggle('show',!!item);
+    ui.communitySafetyActions.classList.toggle('show',!!item);
     $('selectedMapTitle').textContent=item?.title||'맵을 선택하세요';
     $('selectedMapMeta').textContent=item?`by ${item.authorName||item.author||'익명 펭귄'} · PLAY ${item.plays||0} · CLEAR ${item.clears||0}`:'';
     const button=$('communityPrimaryBtn');button.disabled=!item;button.textContent=item?'이 맵 플레이':'플레이할 맵을 선택하세요';
+    $('communityHideAuthorBtn').disabled=!item?.authorId;
+    $('communityDeleteBtn').hidden=!item||!ownedMapIds.has(item.id);
   }
 
   async function selectCommunityMap(id){
     try{
+      if(blockedMapIds.has(id))throw new Error('내가 숨긴 맵입니다. 다시 보려면 숨김 목록을 초기화해주세요.');
       ui.communityStatus.textContent='맵을 불러오는 중…';
       const result=await apiRequest(`/maps/${encodeURIComponent(id)}`);
       const item=result.map||result.item||result;
+      if(isCommunityItemHidden(item))throw new Error('내가 숨긴 제작자의 맵입니다. 다시 보려면 숨김 목록을 초기화해주세요.');
       showSelectedCommunityMap(item);ui.communityStatus.textContent='✓ 제작자가 직접 클리어한 버전';
     }catch(error){ui.communityStatus.textContent=error.message;}
   }
@@ -3205,8 +3279,10 @@
     const sort=$('communitySort')?.value||'newest';
     if(!silent)ui.communityStatus.textContent='온라인 맵을 불러오는 중…';
     const result=await apiRequest(`/maps?sort=${encodeURIComponent(sort)}&q=${encodeURIComponent(query)}&limit=30`);
-    communityMaps=mapListFromResponse(result);renderCommunityMaps();
-    ui.communityStatus.textContent=`직접 클리어 인증된 맵 ${communityMaps.length}개`;
+    const allMaps=mapListFromResponse(result);
+    communityMaps=allMaps.filter(item=>!isCommunityItemHidden(item));renderCommunityMaps();
+    const hiddenCount=allMaps.length-communityMaps.length;
+    ui.communityStatus.textContent=`직접 클리어 인증된 맵 ${communityMaps.length}개${hiddenCount?` · 내가 숨긴 항목 ${hiddenCount}개`:''}`;
     return communityMaps;
   }
 
@@ -3229,6 +3305,67 @@
     selectedCommunityMap=item;activeCommunityMapId=item.id;playContext='community';
     apiRequest(`/maps/${encodeURIComponent(item.id)}/play`,{method:'POST',body:{}}).catch(()=>{});
     await startCustomGame('community',map);
+  }
+
+  function hideSelectedCommunityMap(){
+    const item=selectedCommunityMap;if(!item)return;
+    blockedMapIds.add(item.id);writeStringSet(BLOCKED_MAPS_KEY,blockedMapIds);
+    communityMaps=communityMaps.filter(candidate=>candidate.id!==item.id);
+    showSelectedCommunityMap(null);renderCommunityMaps();
+    ui.communityStatus.textContent='이 맵을 내 기기에서 숨겼습니다.';
+  }
+
+  function hideSelectedCommunityAuthor(){
+    const item=selectedCommunityMap;if(!item?.authorId)return;
+    blockedAuthorIds.add(item.authorId);writeStringSet(BLOCKED_AUTHORS_KEY,blockedAuthorIds);
+    communityMaps=communityMaps.filter(candidate=>candidate.authorId!==item.authorId);
+    showSelectedCommunityMap(null);renderCommunityMaps();
+    ui.communityStatus.textContent='이 제작자의 맵을 내 기기에서 숨겼습니다.';
+  }
+
+  async function resetHiddenCommunity(){
+    blockedMapIds=new Set();blockedAuthorIds=new Set();
+    writeStringSet(BLOCKED_MAPS_KEY,blockedMapIds);writeStringSet(BLOCKED_AUTHORS_KEY,blockedAuthorIds);
+    updateCommunityHiddenControls();
+    try{await loadCommunityMaps();showAppToast('숨긴 맵과 제작자를 다시 표시합니다');}
+    catch(error){ui.communityStatus.textContent=error.message;}
+  }
+
+  function openCommunityReport(){
+    if(!selectedCommunityMap)return;
+    $('reportScope').value='map';$('reportReason').value='abuse';$('reportDetail').value='';
+    setOverlay('reportOverlay');
+  }
+
+  function closeCommunityReport(){setOverlay('communityOverlay');}
+
+  async function submitCommunityReport(){
+    const item=selectedCommunityMap;if(!item){closeCommunityReport();return;}
+    const scope=$('reportScope').value;
+    const reason=$('reportReason').value;
+    const detail=cleanText($('reportDetail').value,240);
+    if(reason==='other'&&!detail){$('reportDetail').focus();showAppToast('기타 사유를 설명해주세요');return;}
+    const button=$('reportSubmitBtn');button.disabled=true;button.textContent='전송 중…';
+    try{
+      await apiRequest(`/maps/${encodeURIComponent(item.id)}/report`,{method:'POST',auth:true,body:{scope,reason,detail}});
+      closeCommunityReport();ui.communityStatus.textContent='신고를 접수했습니다. 운영자가 확인합니다.';showAppToast('신고를 접수했습니다');
+    }catch(error){showAppToast(error.message);}
+    finally{button.disabled=false;button.textContent='신고 보내기';}
+  }
+
+  async function deleteSelectedOwnMap(){
+    const item=selectedCommunityMap;if(!item||!ownedMapIds.has(item.id))return;
+    if(!window.confirm(`“${item.title||'이 맵'}”을 온라인에서 완전히 삭제할까요? 삭제 후 되돌릴 수 없습니다.`))return;
+    const button=$('communityDeleteBtn');button.disabled=true;button.textContent='삭제 중…';
+    try{
+      await apiRequest(`/maps/${encodeURIComponent(item.id)}/delete`,{method:'POST',auth:true,body:{}});
+      ownedMapIds.delete(item.id);writeStringSet(OWN_MAP_IDS_KEY,ownedMapIds);
+      if(publishedDraft?.id===item.id){publishedDraft=null;verifiedDraft=null;safeStore.set(VERIFICATION_KEY,'');}
+      communityMaps=communityMaps.filter(candidate=>candidate.id!==item.id);
+      showSelectedCommunityMap(null);renderCommunityMaps();
+      ui.communityStatus.textContent='내 맵을 온라인에서 삭제했습니다.';showAppToast('맵을 삭제했습니다');
+    }catch(error){ui.communityStatus.textContent=error.message;showAppToast(error.message);}
+    finally{button.disabled=false;button.textContent='내 맵 삭제';}
   }
 
 
@@ -4033,7 +4170,7 @@
 
   function openExitDialog(){
     if(!ui.exitOverlay.classList.contains('hidden'))return;
-    exitReturnOverlay=['startOverlay','pauseOverlay','clearOverlay','selectOverlay','helpOverlay','editorOverlay','communityOverlay']
+    exitReturnOverlay=['startOverlay','pauseOverlay','clearOverlay','selectOverlay','helpOverlay','editorOverlay','communityOverlay','reportOverlay']
       .find(name=>!ui[name].classList.contains('hidden'))||null;
     exitReturnState=state;
     exitReturnPaused=paused;
@@ -4293,6 +4430,13 @@
   $('communityCloseBtn').onclick=()=>{SFX.ui();selectedCommunityMap=null;state='menu';paused=false;setOverlay('startOverlay');};
   $('communityPrimaryBtn').onclick=()=>playSelectedCommunityMap();
   $('communityShareBtn').onclick=()=>shareMap(selectedCommunityMap);
+  $('communityHideMapBtn').onclick=()=>{SFX.ui();hideSelectedCommunityMap();};
+  $('communityHideAuthorBtn').onclick=()=>{SFX.ui();hideSelectedCommunityAuthor();};
+  $('communityReportBtn').onclick=()=>{SFX.ui();openCommunityReport();};
+  $('communityDeleteBtn').onclick=()=>{SFX.ui();deleteSelectedOwnMap();};
+  $('communityResetHiddenBtn').onclick=()=>{SFX.ui();resetHiddenCommunity();};
+  $('reportCancelBtn').onclick=()=>{SFX.ui();closeCommunityReport();};
+  $('reportSubmitBtn').onclick=()=>{SFX.ui();submitCommunityReport();};
   let communitySearchTimer=0;
   $('communitySearch').addEventListener('input',()=>{clearTimeout(communitySearchTimer);communitySearchTimer=setTimeout(()=>loadCommunityMaps().catch(error=>ui.communityStatus.textContent=error.message),260);});
   $('communitySort').addEventListener('change',()=>loadCommunityMaps().catch(error=>ui.communityStatus.textContent=error.message));

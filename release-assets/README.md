@@ -1,4 +1,21 @@
-# 앱인토스 출시 이미지 준비
+# 펭귄 바운스 출시 이미지 준비
+
+Google Play·ONEstore 제출 파일도 이 폴더에서 함께 관리합니다.
+
+## Google Play·ONEstore 제출 세트
+
+| 파일 | 용도 | 규격 |
+| --- | --- | --- |
+| `penguin-bounce-icon-google-512.png` | Google Play 앱 아이콘 | 512×512 PNG |
+| `penguin-bounce-icon-onestore-512.png` | ONEstore 앱 아이콘 | 512×512 PNG |
+| `penguin-bounce-feature-google-1024x500.jpg` | Google Play 대표 그래픽 | 1024×500 JPG |
+| `penguin-bounce-feature-onestore-1024x578.jpg` | ONEstore 대표 그래픽 | 1024×578 JPG |
+| `penguin-bounce-store-screenshot-01-home-1280x720.png` | 게임 소개 화면 | 1280×720 PNG |
+| `penguin-bounce-store-screenshot-02-gameplay-1280x720.png` | 실제 플레이 | 1280×720 PNG |
+| `penguin-bounce-store-screenshot-03-editor-1280x720.png` | 맵 에디터 | 1280×720 PNG |
+| `penguin-bounce-feature-master-1672x941.png` | 대표 그래픽 공용 원본 | 1672×941 PNG |
+
+스크린샷 3장은 출시 빌드를 1280×720에서 직접 캡처했습니다. 대표 그래픽은 기존 펭귄 캐릭터와 실제 얼음 맵을 참고해 만든 홍보용 일러스트이며 실제 플레이 캡처와 구분해 사용합니다.
 
 이 폴더에는 앱인토스 콘솔에 제출할 최종 이미지 또는 그 원본을 정리합니다. 규격은 제출 직전에 [미니앱 등록 가이드](https://developers-apps-in-toss.toss.im/guide/operation/console-workspace.html)와 [UI/UX 가이드](https://developers-apps-in-toss.toss.im/design/consumer-ux-guide.html)에서 다시 확인하세요.
 

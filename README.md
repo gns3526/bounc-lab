@@ -23,6 +23,8 @@ npm start
 - 맵을 한 칸이라도 바꾸면 클리어 인증 즉시 무효화
 - 맵 해시·작성자 토큰·1회용 서명 티켓을 확인한 뒤 서버 게시
 - 최신/인기/클리어순 온라인 갤러리, 검색, 플레이·클리어 수
+- 게시 전 커뮤니티 규칙 동의, 맵·제작자 신고와 기기 내 숨김, 본인 맵 삭제
+- 운영자 신고 큐와 맵·제작자 단위 숨김·삭제 조치
 - `?map=<map-id>` 공유 링크로 게시된 불변 버전 바로 열기
 - 데스크톱·모바일 반응형 단일 화면 UI
 
@@ -40,6 +42,7 @@ npm start
 
 ```powershell
 $env:PUBLISH_SECRET = '32바이트 이상의 충분히 긴 무작위 문자열'
+$env:MODERATION_TOKEN = '운영자 API용 별도 무작위 문자열'
 $env:PORT = '8787'
 npm start
 ```
@@ -67,6 +70,17 @@ npm run build:toss:dev
 
 실제 제출용 빌드는 `TOSS_APP_NAME`을 생략하면 확정값 `penguin-bounce`를 사용하고, 명시한 값이 확정값과 다르면 중단됩니다. 공개 HTTPS `VITE_API_BASE_URL`은 반드시 필요합니다. 콘솔 정보, 이미지 규격, 등급분류, 외부 API 배포와 QR 실기기 검증은 [TOSS_RELEASE.md](./TOSS_RELEASE.md)를 따르세요.
 
+## ONEstore·Google Play Android 빌드
+
+두 Android 스토어는 공통 Capacitor 래퍼를 사용합니다. 공개 HTTPS API를 설정한 뒤 다음 명령으로 웹 자산을 빌드하고 Android 프로젝트에 동기화합니다.
+
+```powershell
+Copy-Item .env.android.example .env.android
+npm run sync:android
+```
+
+현재 application ID는 `com.jellysnow.penguinbounce`이며 최초 스토어 등록 전에는 변경할 수 있습니다. SDK/API 버전, 서명키 보관, CORS Origin과 스토어 출력 절차는 [ANDROID_RELEASE.md](./ANDROID_RELEASE.md)를 따르세요. 스토어 문구·IARC·Data safety 입력값은 [STORE_RELEASE.md](./STORE_RELEASE.md)에 정리했고, 개인정보처리방침 원본은 [public/privacy.html](./public/privacy.html)입니다.
+
 ## 후속 접근성 과제
 
 - 모든 오버레이를 공통 modal dialog로 전환하고 초점 이동·초점 가두기·원위치 복귀·Escape 닫기를 제공합니다.
@@ -79,6 +93,8 @@ public/index.html    게임·에디터·온라인 갤러리
 public/assets/audio/ 두 곡의 BGM 음원
 public/toss-bridge.js 앱인토스 사용자·Safe Area·공유·종료 어댑터
 apps-in-toss.config.ts SDK 3 미니앱 설정
+capacitor.config.ts  ONEstore·Google Play 공통 Android 래퍼 설정
+android/             Capacitor Android API 36 프로젝트
 vite.config.mjs      웹/Toss 번들 설정
 server.mjs          정적 서버와 커뮤니티 맵 API
 physics-proof.mjs   서버 측 결정적 클리어 리플레이 검증기
@@ -86,4 +102,6 @@ data/maps.json      게시 맵 저장소
 test/               Node 통합 테스트
 BACKEND.md          API 및 운영 문서
 TOSS_RELEASE.md      앱인토스 제출·운영 체크리스트
+ANDROID_RELEASE.md   Android 빌드·서명·스토어 준비 안내
+STORE_RELEASE.md     Google Play·ONEstore 등록 정보와 정책 응답
 ```

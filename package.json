@@ -14,14 +14,23 @@
     "dev:web": "vite --mode web",
     "dev:toss": "vite --mode toss-dev",
     "build:web": "vite build --mode web",
+    "build:android:web": "node scripts/validate-android-release.mjs && vite build --mode android",
+    "sync:android": "npm run build:android:web && cap sync android",
+    "open:android": "cap open android",
+    "build:android:aab": "npm run sync:android && cd android && gradlew.bat bundleRelease",
+    "build:android:apk": "npm run sync:android && cd android && gradlew.bat assembleRelease",
     "build:toss:dev": "node scripts/validate-toss-release.mjs --development && vite build --mode toss-dev && ait build",
     "build:toss": "node scripts/validate-toss-release.mjs && vite build --mode toss && ait build",
     "deploy:toss": "npm run build:toss && ait deploy"
   },
   "dependencies": {
-    "@apps-in-toss/web-framework": "3.0.2"
+    "@apps-in-toss/web-framework": "3.0.2",
+    "@capacitor/android": "8.5.0",
+    "@capacitor/core": "8.5.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.5.0",
+    "typescript": "7.0.2",
     "vite": "8.2.1"
   }
 }

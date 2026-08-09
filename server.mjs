@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import { createReadStream } from 'node:fs';
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
+import { isIP } from 'node:net';
 import { dirname, extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -15,6 +16,27 @@ const TOKEN_MIN_LENGTH = 16;
 const TOKEN_MAX_LENGTH = 256;
 const GRID_ROWS = 15;
 const GRID_COLUMNS = 20;
+const STORAGE_VERSION = 3;
+const COMMUNITY_TERMS_VERSION = '2026-08-10-v1';
+const REPORT_SCOPES = Object.freeze(['map', 'author']);
+const REPORT_REASONS = Object.freeze([
+  'abuse',
+  'hate',
+  'sexual',
+  'violence',
+  'personal_info',
+  'spam',
+  'illegal',
+  'copyright',
+  'other',
+]);
+const MODERATION_ACTIONS = Object.freeze([
+  'dismiss',
+  'hide_map',
+  'hide_author',
+  'delete_map',
+  'delete_author',
+]);
 const CORS_ALLOWED_METHODS = Object.freeze(['GET', 'HEAD', 'POST', 'OPTIONS']);
 const CORS_ALLOWED_HEADERS = Object.freeze(['Accept', 'Content-Type', 'X-Author-Token']);
 
@@ -209,6 +231,20 @@ function sanitizeText(value, { field, maxLength, fallback = '' }) {
   return clipped;
 }
 
+function sanitizeOptionalText(value, { maxLength }) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string') {
+    throw new ApiError(400, 'INVALID_TEXT', '신고 설명은 문자열이어야 합니다.');
+  }
+  return [...value
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f]/g, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()].slice(0, maxLength).join('').trim();
+}
+
 function canonicalizeMap(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new ApiError(400, 'INVALID_MAP', '맵 데이터가 필요합니다.');
@@ -277,6 +313,44 @@ function mapHash(map) {
 
 function hashOwnerToken(token) {
   return createHash('sha256').update(`bounce-owner-v1\0${token}`).digest('hex');
+}
+
+function publicAuthorId(ownerHash) {
+  return createHash('sha256')
+    .update(`bounce-public-author-v1\0${ownerHash}`)
+    .digest('base64url')
+    .slice(0, 22);
+}
+
+function legacyAuthorId(record) {
+  return createHash('sha256')
+    .update(`bounce-legacy-author-v1\0${record.id}\0${record.author}`)
+    .digest('base64url')
+    .slice(0, 22);
+}
+
+function deriveModerationToken(secret) {
+  return createHmac('sha256', secret).update('bounce-moderation-v1').digest('base64url');
+}
+
+function validateProductionSecret(value, name) {
+  if (typeof value !== 'string' || value.length < 32 || value.length > 512
+    || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw new Error(`${name} must be a 32-512 character secret in production`);
+  }
+  return value;
+}
+
+function requireModerationToken(request, expectedToken) {
+  const supplied = request.headers['x-moderation-token'];
+  if (Array.isArray(supplied) || typeof supplied !== 'string' || supplied.length > 512) {
+    throw new ApiError(401, 'MODERATION_AUTH_REQUIRED', '운영자 인증이 필요합니다.');
+  }
+  const expectedDigest = createHash('sha256').update(expectedToken).digest();
+  const suppliedDigest = createHash('sha256').update(supplied).digest();
+  if (!timingSafeEqual(expectedDigest, suppliedDigest)) {
+    throw new ApiError(403, 'MODERATION_AUTH_DENIED', '운영자 인증이 올바르지 않습니다.');
+  }
 }
 
 function authorTokenFrom(request, body) {
@@ -373,6 +447,7 @@ function publicMapRecord(record, includeMap = true) {
     id: record.id,
     title: record.title,
     author: record.author,
+    authorId: record.authorId,
     mapHash: record.mapHash,
     createdAt: record.createdAt,
     plays: record.plays,
@@ -382,9 +457,30 @@ function publicMapRecord(record, includeMap = true) {
   return result;
 }
 
+function publicReportRecord(report, map) {
+  return {
+    id: report.id,
+    mapId: report.mapId,
+    mapTitle: map?.title ?? '삭제된 맵',
+    author: map?.author ?? '',
+    authorId: report.authorId,
+    scope: report.scope,
+    reason: report.reason,
+    detail: report.detail,
+    status: report.status,
+    createdAt: report.createdAt,
+    resolvedAt: report.resolvedAt,
+    resolution: report.resolution,
+  };
+}
+
 function validateStoredState(input) {
   if (!input || typeof input !== 'object' || !Array.isArray(input.maps)) {
     throw new Error('maps.json must contain an object with a maps array');
+  }
+  const inputVersion = input.version ?? 1;
+  if (!Number.isSafeInteger(inputVersion) || inputVersion < 1 || inputVersion > STORAGE_VERSION) {
+    throw new Error(`Unsupported maps.json version: ${inputVersion}`);
   }
   const ids = new Set();
   const maps = input.maps.map((record) => {
@@ -395,25 +491,69 @@ function validateStoredState(input) {
     const map = canonicalizeMap(record.map);
     const calculatedHash = mapHash(map);
     if (record.mapHash !== calculatedHash) throw new Error(`Stored map hash mismatch: ${record.id}`);
+    const ownerHash = typeof record.ownerHash === 'string' && /^[a-f0-9]{64}$/.test(record.ownerHash)
+      ? record.ownerHash
+      : null;
+    const derivedAuthorId = ownerHash ? publicAuthorId(ownerHash) : legacyAuthorId(record);
+    const authorId = typeof record.authorId === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(record.authorId)
+      ? record.authorId
+      : derivedAuthorId;
     return {
       id: record.id,
       title: String(record.title),
       author: String(record.author),
+      authorId,
+      ownerHash,
       mapHash: calculatedHash,
       map,
       createdAt: String(record.createdAt),
       plays: Number.isSafeInteger(record.plays) && record.plays >= 0 ? record.plays : 0,
       clears: Number.isSafeInteger(record.clears) && record.clears >= 0 ? record.clears : 0,
       ticketId: String(record.ticketId),
+      termsVersion: typeof record.termsVersion === 'string' && record.termsVersion
+        ? record.termsVersion
+        : 'legacy-v1',
+      status: record.status === 'hidden' ? 'hidden' : 'active',
+      moderatedAt: typeof record.moderatedAt === 'string' ? record.moderatedAt : '',
     };
   });
-  return { version: 1, maps };
+  const mapIds = new Set(maps.map((record) => record.id));
+  const reportIds = new Set();
+  const reports = (Array.isArray(input.reports) ? input.reports : []).map((report) => {
+    if (!report || typeof report !== 'object' || typeof report.id !== 'string'
+      || reportIds.has(report.id) || !mapIds.has(report.mapId)) {
+      throw new Error('maps.json contains an invalid or duplicate report');
+    }
+    reportIds.add(report.id);
+    if (!REPORT_SCOPES.includes(report.scope) || !REPORT_REASONS.includes(report.reason)) {
+      throw new Error(`Stored report has an unsupported category: ${report.id}`);
+    }
+    return {
+      id: report.id,
+      mapId: String(report.mapId),
+      authorId: String(report.authorId),
+      reporterId: String(report.reporterId),
+      scope: report.scope,
+      reason: report.reason,
+      detail: String(report.detail ?? ''),
+      status: ['open', 'resolved', 'dismissed'].includes(report.status) ? report.status : 'open',
+      createdAt: String(report.createdAt),
+      resolvedAt: typeof report.resolvedAt === 'string' ? report.resolvedAt : '',
+      resolution: typeof report.resolution === 'string' ? report.resolution : '',
+    };
+  });
+  const blockedAuthors = [...new Set(Array.isArray(input.blockedAuthors) ? input.blockedAuthors : [])];
+  if (blockedAuthors.some((authorId) => typeof authorId !== 'string'
+    || !/^[A-Za-z0-9_-]{16,64}$/.test(authorId))) {
+    throw new Error('maps.json contains an invalid blocked author id');
+  }
+  return { version: STORAGE_VERSION, maps, reports, blockedAuthors };
 }
 
 class MapStore {
   constructor(filePath) {
     this.filePath = filePath;
-    this.state = { version: 1, maps: [] };
+    this.state = { version: STORAGE_VERSION, maps: [], reports: [], blockedAuthors: [] };
     this.writeQueue = Promise.resolve();
   }
 
@@ -422,6 +562,8 @@ class MapStore {
     try {
       const raw = await readFile(this.filePath, 'utf8');
       this.state = validateStoredState(JSON.parse(raw));
+      const normalized = `${JSON.stringify(this.state, null, 2)}\n`;
+      if (raw !== normalized) await this.#atomicWrite(this.state);
     } catch (error) {
       if (error?.code !== 'ENOENT') throw error;
       await this.#atomicWrite(this.state);
@@ -434,6 +576,14 @@ class MapStore {
 
   get(id) {
     return this.state.maps.find((map) => map.id === id);
+  }
+
+  reports() {
+    return this.state.reports;
+  }
+
+  blockedAuthors() {
+    return this.state.blockedAuthors;
   }
 
   async update(mutator) {
@@ -490,8 +640,14 @@ class FixedWindowRateLimiter {
   }
 }
 
-function requestIp(request) {
-  return request.socket.remoteAddress || 'unknown';
+function requestIp(request, trustProxy = false) {
+  const socketAddress = request.socket.remoteAddress || 'unknown';
+  if (!trustProxy) return socketAddress;
+  const forwarded = request.headers['x-forwarded-for'];
+  if (Array.isArray(forwarded) || typeof forwarded !== 'string' || forwarded.length > 1_024) return socketAddress;
+  const addresses = forwarded.split(',').map((value) => value.trim()).filter(Boolean);
+  const nearestForwardedAddress = addresses.at(-1) || '';
+  return isIP(nearestForwardedAddress) ? nearestForwardedAddress : socketAddress;
 }
 
 function requireRateLimit(response, limiter, key, now) {
@@ -571,8 +727,17 @@ export async function createBounceServer(options = {}) {
   const publicDirectory = resolve(options.publicDirectory ?? resolve(moduleDirectory, 'public'));
   const dataFile = resolve(options.dataFile ?? process.env.DATA_FILE ?? resolve(moduleDirectory, 'data', 'maps.json'));
   const now = options.now ?? (() => Date.now());
-  const secret = options.publishSecret ?? process.env.PUBLISH_SECRET ?? randomBytes(32).toString('hex');
   const runtimeEnvironment = options.nodeEnv ?? process.env.NODE_ENV ?? 'development';
+  const configuredPublishSecret = options.publishSecret ?? process.env.PUBLISH_SECRET;
+  const secret = runtimeEnvironment === 'production'
+    ? validateProductionSecret(configuredPublishSecret, 'PUBLISH_SECRET')
+    : configuredPublishSecret ?? randomBytes(32).toString('hex');
+  const configuredModerationToken = options.moderationToken ?? process.env.MODERATION_TOKEN;
+  const moderationToken = runtimeEnvironment === 'production'
+    ? validateProductionSecret(configuredModerationToken, 'MODERATION_TOKEN')
+    : configuredModerationToken ?? deriveModerationToken(secret);
+  const trustProxy = options.trustProxy
+    ?? /^(?:1|true|yes)$/i.test(process.env.TRUST_PROXY ?? '');
   const allowedOrigins = createAllowedOrigins({
     tossAppName: options.tossAppName ?? process.env.TOSS_APP_NAME,
     configuredOrigins: options.allowedOrigins ?? process.env.ALLOWED_ORIGINS,
@@ -587,6 +752,10 @@ export async function createBounceServer(options = {}) {
 
   const generalLimiter = new FixedWindowRateLimiter({ limit: options.generalRateLimit ?? 240, windowMs: 60_000 });
   const writeLimiter = new FixedWindowRateLimiter({ limit: options.writeRateLimit ?? 60, windowMs: 60_000 });
+  const reportLimiter = new FixedWindowRateLimiter({
+    limit: options.reportRateLimit ?? 8,
+    windowMs: options.reportRateWindowMs ?? 60 * 60 * 1000,
+  });
 
   function purgeExpiredAttempts(currentTime) {
     if (attempts.size < 100 && Math.random() > 0.05) return;
@@ -600,6 +769,7 @@ export async function createBounceServer(options = {}) {
       const requestUrl = new URL(request.url || '/', 'http://localhost');
       const pathname = requestUrl.pathname;
       const currentTime = now();
+      const requestAddress = requestIp(request, trustProxy);
 
       if (pathname.startsWith('/api/')) {
         applyApiCors(request, response, corsOptions);
@@ -607,10 +777,9 @@ export async function createBounceServer(options = {}) {
           handleApiPreflight(request, response);
           return;
         }
-        const ip = requestIp(request);
-        if (!requireRateLimit(response, generalLimiter, `all:${ip}`, currentTime)) return;
+        if (!requireRateLimit(response, generalLimiter, `all:${requestAddress}`, currentTime)) return;
         if (request.method !== 'GET' && request.method !== 'HEAD'
-          && !requireRateLimit(response, writeLimiter, `write:${ip}`, currentTime)) return;
+          && !requireRateLimit(response, writeLimiter, `write:${requestAddress}`, currentTime)) return;
       }
 
       if (request.method === 'GET' && pathname === '/api/health') {
@@ -618,9 +787,77 @@ export async function createBounceServer(options = {}) {
           ok: true,
           status: 'ok',
           service: 'bounce-map-api',
-          mapCount: store.list().length,
+          mapCount: store.list().filter((record) => record.status === 'active').length,
           now: new Date(currentTime).toISOString(),
         });
+        return;
+      }
+
+      if (request.method === 'GET' && pathname === '/api/moderation/reports') {
+        requireModerationToken(request, moderationToken);
+        const status = requestUrl.searchParams.get('status') || 'open';
+        if (!['open', 'resolved', 'dismissed', 'all'].includes(status)) {
+          throw new ApiError(400, 'INVALID_REPORT_STATUS', 'status는 open, resolved, dismissed, all 중 하나여야 합니다.');
+        }
+        const reports = store.reports()
+          .filter((report) => status === 'all' || report.status === status)
+          .slice()
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .map((report) => publicReportRecord(report, store.get(report.mapId)));
+        sendJson(response, 200, { ok: true, reports });
+        return;
+      }
+
+      const moderationMatch = routeMatch(pathname, /^\/api\/moderation\/reports\/([^/]+)$/);
+      if (request.method === 'POST' && moderationMatch) {
+        requireModerationToken(request, moderationToken);
+        const body = await readJsonBody(request);
+        const action = typeof body.action === 'string' ? body.action : '';
+        if (!MODERATION_ACTIONS.includes(action)) {
+          throw new ApiError(400, 'INVALID_MODERATION_ACTION', `action은 ${MODERATION_ACTIONS.join(', ')} 중 하나여야 합니다.`);
+        }
+        const reportId = moderationMatch[0];
+        const report = store.reports().find((candidate) => candidate.id === reportId);
+        if (!report) throw new ApiError(404, 'REPORT_NOT_FOUND', '신고를 찾을 수 없습니다.');
+        const affectedMapIds = [];
+        await store.update((state) => {
+          const targetReport = state.reports.find((candidate) => candidate.id === reportId);
+          if (!targetReport) throw new ApiError(404, 'REPORT_NOT_FOUND', '신고를 찾을 수 없습니다.');
+          const targetMap = state.maps.find((candidate) => candidate.id === targetReport.mapId);
+          if (!targetMap) throw new ApiError(404, 'MAP_NOT_FOUND', '신고된 맵을 찾을 수 없습니다.');
+
+          if (action === 'dismiss') {
+            targetReport.status = 'dismissed';
+            targetReport.resolvedAt = new Date(currentTime).toISOString();
+            targetReport.resolution = action;
+            return;
+          }
+
+          const authorWide = action.endsWith('_author');
+          const targets = state.maps.filter((candidate) => authorWide
+            ? candidate.authorId === targetReport.authorId
+            : candidate.id === targetReport.mapId);
+          affectedMapIds.push(...targets.map((candidate) => candidate.id));
+          if (authorWide && !state.blockedAuthors.includes(targetReport.authorId)) {
+            state.blockedAuthors.push(targetReport.authorId);
+          }
+
+          if (action.startsWith('hide_')) {
+            for (const candidate of targets) {
+              candidate.status = 'hidden';
+              candidate.moderatedAt = new Date(currentTime).toISOString();
+            }
+            targetReport.status = 'resolved';
+            targetReport.resolvedAt = new Date(currentTime).toISOString();
+            targetReport.resolution = action;
+            return;
+          }
+
+          const targetIds = new Set(targets.map((candidate) => candidate.id));
+          state.maps = state.maps.filter((candidate) => !targetIds.has(candidate.id));
+          state.reports = state.reports.filter((candidate) => !targetIds.has(candidate.mapId));
+        });
+        sendJson(response, 200, { ok: true, action, affectedMapIds });
         return;
       }
 
@@ -641,9 +878,9 @@ export async function createBounceServer(options = {}) {
         if (!sorters[sort]) {
           throw new ApiError(400, 'INVALID_SORT', 'sort는 newest, oldest, popular, plays, clears 중 하나여야 합니다.');
         }
-        const filtered = store.list().filter((record) => !query
+        const filtered = store.list().filter((record) => record.status === 'active' && (!query
           || record.title.toLocaleLowerCase('ko-KR').includes(query)
-          || record.author.toLocaleLowerCase('ko-KR').includes(query));
+          || record.author.toLocaleLowerCase('ko-KR').includes(query)));
         filtered.sort(sorters[sort]);
         const total = filtered.length;
         const start = (page - 1) * limit;
@@ -660,8 +897,82 @@ export async function createBounceServer(options = {}) {
       const detailMatch = routeMatch(pathname, /^\/api\/maps\/([^/]+)$/);
       if (request.method === 'GET' && detailMatch) {
         const record = store.get(detailMatch[0]);
-        if (!record) throw new ApiError(404, 'MAP_NOT_FOUND', '맵을 찾을 수 없습니다.');
+        if (!record || record.status !== 'active') throw new ApiError(404, 'MAP_NOT_FOUND', '맵을 찾을 수 없습니다.');
         sendJson(response, 200, { ok: true, map: publicMapRecord(record, true) });
+        return;
+      }
+
+      const reportMatch = routeMatch(pathname, /^\/api\/maps\/([^/]+)\/report$/);
+      if (request.method === 'POST' && reportMatch) {
+        const body = await readJsonBody(request);
+        const token = authorTokenFrom(request, body);
+        const record = store.get(reportMatch[0]);
+        if (!record || record.status !== 'active') throw new ApiError(404, 'MAP_NOT_FOUND', '맵을 찾을 수 없습니다.');
+        const scope = typeof body.scope === 'string' ? body.scope : '';
+        const reason = typeof body.reason === 'string' ? body.reason : '';
+        if (!REPORT_SCOPES.includes(scope)) {
+          throw new ApiError(400, 'INVALID_REPORT_SCOPE', '신고 대상은 map 또는 author여야 합니다.');
+        }
+        if (!REPORT_REASONS.includes(reason)) {
+          throw new ApiError(400, 'INVALID_REPORT_REASON', '지원하지 않는 신고 사유입니다.');
+        }
+        const detail = sanitizeOptionalText(body.detail, { maxLength: 240 });
+        if (reason === 'other' && !detail) {
+          throw new ApiError(400, 'REPORT_DETAIL_REQUIRED', '기타 신고 사유를 간단히 적어주세요.');
+        }
+        const reporterId = publicAuthorId(hashOwnerToken(token));
+        if (!requireRateLimit(response, reportLimiter, `report-ip:${requestAddress}`, currentTime)) return;
+        if (!requireRateLimit(response, reportLimiter, `reporter:${reporterId}`, currentTime)) return;
+
+        let reportRecord;
+        let duplicate = false;
+        await store.update((state) => {
+          const targetMap = state.maps.find((candidate) => candidate.id === record.id && candidate.status === 'active');
+          if (!targetMap) throw new ApiError(404, 'MAP_NOT_FOUND', '맵을 찾을 수 없습니다.');
+          const existing = state.reports.find((candidate) => candidate.mapId === targetMap.id
+            && candidate.reporterId === reporterId && candidate.scope === scope && candidate.status === 'open');
+          if (existing) {
+            reportRecord = existing;
+            duplicate = true;
+            return;
+          }
+          reportRecord = {
+            id: `report_${randomBytes(12).toString('base64url')}`,
+            mapId: targetMap.id,
+            authorId: targetMap.authorId,
+            reporterId,
+            scope,
+            reason,
+            detail,
+            status: 'open',
+            createdAt: new Date(currentTime).toISOString(),
+            resolvedAt: '',
+            resolution: '',
+          };
+          state.reports.push(reportRecord);
+        });
+        sendJson(response, duplicate ? 200 : 201, {
+          ok: true,
+          duplicate,
+          report: { id: reportRecord.id, status: reportRecord.status },
+        });
+        return;
+      }
+
+      const deleteMatch = routeMatch(pathname, /^\/api\/maps\/([^/]+)\/delete$/);
+      if (request.method === 'POST' && deleteMatch) {
+        const body = await readJsonBody(request);
+        const token = authorTokenFrom(request, body);
+        const record = store.get(deleteMatch[0]);
+        if (!record) throw new ApiError(404, 'MAP_NOT_FOUND', '맵을 찾을 수 없습니다.');
+        if (!record.ownerHash || record.ownerHash !== hashOwnerToken(token)) {
+          throw new ApiError(403, 'MAP_OWNER_MISMATCH', '이 맵을 게시한 제작자만 삭제할 수 있습니다.');
+        }
+        await store.update((state) => {
+          state.maps = state.maps.filter((candidate) => candidate.id !== record.id);
+          state.reports = state.reports.filter((candidate) => candidate.mapId !== record.id);
+        });
+        sendJson(response, 200, { ok: true, deleted: true, id: record.id });
         return;
       }
 
@@ -754,6 +1065,11 @@ export async function createBounceServer(options = {}) {
         if (ticketPayload.mapHash !== calculatedMapHash) {
           throw new ApiError(409, 'TICKET_MAP_MISMATCH', '클리어한 맵과 게시하려는 맵이 다릅니다.');
         }
+        if (body.termsVersion !== COMMUNITY_TERMS_VERSION) {
+          throw new ApiError(400, 'TERMS_ACCEPTANCE_REQUIRED', '최신 커뮤니티 이용규칙에 동의한 뒤 게시해주세요.', {
+            termsVersion: COMMUNITY_TERMS_VERSION,
+          });
+        }
         const title = sanitizeText(body.title, { field: '맵 제목', maxLength: 60 });
         const author = sanitizeText(body.author, { field: '작성자 이름', maxLength: 24, fallback: '익명' });
         const id = `map_${randomBytes(12).toString('base64url')}`;
@@ -761,14 +1077,22 @@ export async function createBounceServer(options = {}) {
           id,
           title,
           author,
+          authorId: publicAuthorId(ownerHash),
+          ownerHash,
           mapHash: calculatedMapHash,
           map,
           createdAt: new Date(currentTime).toISOString(),
           plays: 0,
           clears: 0,
           ticketId: ticketPayload.jti,
+          termsVersion: COMMUNITY_TERMS_VERSION,
+          status: 'active',
+          moderatedAt: '',
         };
         await store.update((state) => {
+          if (state.blockedAuthors.includes(record.authorId)) {
+            throw new ApiError(403, 'AUTHOR_PUBLISH_BLOCKED', '커뮤니티 이용규칙 위반으로 이 익명 제작자의 게시가 제한되었습니다.');
+          }
           if (state.maps.some((candidate) => candidate.ticketId === ticketPayload.jti)) {
             throw new ApiError(409, 'PUBLISH_TICKET_USED', '이미 사용한 게시 티켓입니다.');
           }
@@ -785,7 +1109,7 @@ export async function createBounceServer(options = {}) {
         const [id, action] = counterMatch;
         const counters = await store.update((state) => {
           const record = state.maps.find((candidate) => candidate.id === id);
-          if (!record) throw new ApiError(404, 'MAP_NOT_FOUND', '맵을 찾을 수 없습니다.');
+          if (!record || record.status !== 'active') throw new ApiError(404, 'MAP_NOT_FOUND', '맵을 찾을 수 없습니다.');
           if (action === 'play') record.plays += 1;
           else record.clears += 1;
           return { plays: record.plays, clears: record.clears };

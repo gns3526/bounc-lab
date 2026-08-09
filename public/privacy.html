@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="color-scheme" content="light" />
+  <title>펭귄 바운스 개인정보처리방침</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;color:#173458;background:#eaf8ff;line-height:1.65}
+    *{box-sizing:border-box}body{margin:0;padding:max(22px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(30px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+    main{width:min(760px,100%);margin:auto;padding:clamp(20px,5vw,42px);border:1px solid #b9def1;border-radius:24px;background:#fff;box-shadow:0 12px 34px rgba(23,52,88,.1)}
+    h1{margin:0 0 8px;font-size:clamp(26px,6vw,38px);line-height:1.2}h2{margin:32px 0 8px;font-size:20px}h3{margin:20px 0 6px;font-size:16px}
+    p,li{font-size:15px}ul{padding-left:22px}.summary{padding:14px 16px;border-radius:14px;background:#effaff}.notice{padding:12px 14px;border-left:4px solid #e0a42e;background:#fff8dc}
+    table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px;border:1px solid #cfe6f3;text-align:left;vertical-align:top}th{background:#effaff}a{color:#1767a8}footer{margin-top:34px;color:#527392;font-size:13px}
+    @media(max-width:620px){main{padding:20px 16px;border-radius:18px}table,tbody,tr,th,td{display:block}thead{display:none}tr{margin:12px 0;border:1px solid #cfe6f3}td{border:0;border-bottom:1px solid #e1eef5}td:last-child{border-bottom:0}td::before{content:attr(data-label);display:block;margin-bottom:3px;font-weight:800;color:#315c88}}
+  </style>
+</head>
+<body>
+<main>
+  <h1>개인정보처리방침</h1>
+  <p><strong>펭귄 바운스</strong>는 공식 스테이지 플레이와 이용자가 만든 온라인 맵의 검증·게시·공유·신고 기능을 제공합니다.</p>
+  <p class="summary">광고 SDK나 별도 행동분석 SDK를 사용하지 않습니다. 온라인 맵 기능을 사용하지 않으면 대부분의 게임 정보는 기기 안에만 저장됩니다.</p>
+
+  <h2>1. 처리하는 정보</h2>
+  <table>
+    <thead><tr><th>구분</th><th>항목</th><th>처리 방식</th></tr></thead>
+    <tbody>
+      <tr><td data-label="구분">기기 내 게임 정보</td><td data-label="항목">스테이지 진행, 점수, 음향·조작 설정, 직접 만든 맵 초안, 최근 맵 제목·제작자명, 무작위 익명 작성자 토큰, 커뮤니티 약관 동의 버전, 내 게시 맵 ID, 내가 숨긴 맵·제작자 ID</td><td data-label="처리 방식">앱 WebView의 로컬 저장소에 보관됩니다.</td></tr>
+      <tr><td data-label="구분">토스에서 전달될 수 있는 정보</td><td data-label="항목">토스의 익명 이용자 식별 해시, 프로필 닉네임</td><td data-label="처리 방식">식별 해시는 익명 작성자 토큰을 만드는 데 사용하고, 닉네임은 제작자 표시명 입력을 편하게 채우는 데 사용합니다. 앱 기기 내 저장소에 보관될 수 있습니다.</td></tr>
+      <tr><td data-label="구분">온라인 게시 정보</td><td data-label="항목">맵 제목, 이용자가 입력한 제작자 표시명, 20×15 맵 구조·시작점·출구, 게시 시각, 플레이·클리어 횟수, 공개용 익명 제작자 ID</td><td data-label="처리 방식">온라인 맵 서버에 저장되며 다른 이용자에게 공개됩니다. 작성자 토큰 원문과 비공개 소유권 해시는 공개 API로 제공하지 않습니다.</td></tr>
+      <tr><td data-label="구분">클리어 검증 및 소유권 정보</td><td data-label="항목">맵 구조, 좌우 입력 리플레이, 플레이 시간·바운드 횟수, 작성자 토큰의 SHA-256 해시, 동의한 약관 버전</td><td data-label="처리 방식">직접 클리어한 맵만 게시하고 본인 게시물 삭제 권한을 확인하기 위해 사용합니다.</td></tr>
+      <tr><td data-label="구분">신고 정보</td><td data-label="항목">신고 대상 맵·제작자, 신고 사유와 이용자가 입력한 설명, 신고자 익명 식별값, 접수·처리 시각과 조치 결과</td><td data-label="처리 방식">커뮤니티 이용규칙 위반을 검토하고 콘텐츠를 숨기거나 삭제하기 위해 서버에 저장합니다.</td></tr>
+      <tr><td data-label="구분">접속 정보</td><td data-label="항목">요청 IP 주소</td><td data-label="처리 방식">과도한 요청을 제한하기 위한 서버 메모리 키로 사용하며 앱의 맵 저장 파일에는 기록하지 않습니다. 호스팅 사업자의 기본 접속 로그에는 별도 정책에 따라 남을 수 있습니다.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. 이용 목적</h2>
+  <ul>
+    <li>게임 진행과 이용자 설정 복원</li>
+    <li>맵 초안 저장, 클리어 검증, 온라인 게시와 공유</li>
+    <li>게시 맵 검색·정렬 및 플레이·클리어 통계 제공</li>
+    <li>맵·제작자 신고, 기기 내 숨김, 본인 게시물 삭제와 운영자 조치</li>
+    <li>부정 게시 방지, 약관 동의 확인, 서비스 안정성 유지와 요청 횟수 제한</li>
+  </ul>
+
+  <h2>3. 보관 기간</h2>
+  <ul>
+    <li>기기 내 정보: 앱 데이터 삭제 또는 앱 제거 시까지</li>
+    <li>검증 시도: 생성 후 2시간 동안 유효하며, 만료 후 정리 작업 또는 서버 재시작 때 삭제</li>
+    <li>게시 티켓: 발급 후 20분 동안 유효하며 사용 또는 관련 검증 기록 정리 때까지</li>
+    <li>IP 기반 요청 제한 상태: 일반 요청은 1분, 신고 요청은 1시간의 제한 창 동안 서버 메모리에서 처리</li>
+    <li>게시된 맵과 표시명·소유권 정보: 이용자가 직접 삭제하거나 삭제 요청이 처리되거나 서비스가 종료될 때까지</li>
+    <li>신고 및 처리 기록: 신고 검토, 분쟁 대응과 커뮤니티 보호에 필요한 기간 또는 관련 맵 삭제 때까지</li>
+  </ul>
+
+  <h2>4. 공개 및 제3자 제공</h2>
+  <p>온라인 게시 버튼을 누르면 맵 제목, 제작자 표시명, 맵 내용, 게시 시각, 이용 통계와 공개용 익명 제작자 ID가 누구나 조회할 수 있게 공개됩니다. 실명이나 연락처 등 공개를 원하지 않는 정보는 제작자명과 제목에 입력하지 마세요. 공유 기능을 사용하면 토스 또는 운영체제의 공유 화면으로 맵 링크와 제목이 전달될 수 있습니다.</p>
+  <p>현재 광고, 맞춤형 추천 또는 외부 분석을 목적으로 개인정보를 제3자에게 제공하지 않습니다. 서버 호스팅 과정에서 인프라 제공자가 데이터 처리에 관여할 수 있으며, 실제 운영 사업자가 확정되면 공개 방침에 사업자와 국외 처리 여부를 반영합니다.</p>
+
+  <h2>5. 삭제 및 이용자 권리</h2>
+  <p>기기 내 정보는 운영체제의 앱 정보에서 저장공간·데이터를 삭제하거나 앱을 제거해 지울 수 있습니다. 현재 버전에서 게시했고 게시한 기기의 익명 작성자 토큰이 유지되는 맵은 온라인 맵에서 해당 맵을 선택하고 <strong>내 맵 삭제</strong>를 눌러 맵과 관련 신고 기록을 삭제할 수 있습니다.</p>
+  <p>기기 변경 또는 앱 데이터 삭제로 자동 소유권 확인이 어려운 경우 맵 ID, 맵 제목, 제작자 표시명과 요청 사유를 아래 이메일로 보내주세요. 비밀번호, 익명 작성자 토큰, 서명키는 보내지 마세요. 운영자는 필요한 확인을 거쳐 게시 맵과 관련 공개 정보를 삭제합니다.</p>
+
+  <h2>6. 안전조치</h2>
+  <ul>
+    <li>운영 API는 공개 HTTPS 연결만 사용합니다.</li>
+    <li>작성자 토큰은 무작위로 생성하고 서버 게시 기록에는 원문을 저장하지 않습니다.</li>
+    <li>입력 크기·형식 검증, 게시·신고 요청 제한, 1회용 게시 티켓과 서버 측 클리어 재검증을 적용합니다.</li>
+    <li>신고·기기 내 차단·본인 삭제 기능과 운영자 전용 숨김·삭제 조치를 제공합니다.</li>
+  </ul>
+
+  <h2>7. 문의</h2>
+  <p>개인정보 열람·삭제·처리정지, 신고 조치 이의 제기 및 기타 문의는 아래 이메일로 접수해 주세요.</p>
+  <p><strong>개인정보 보호 문의:</strong> 펭귄 바운스 운영팀 · <a href="mailto:hoon@jellysnow.com">hoon@jellysnow.com</a></p>
+  <p><a href="./terms.html">이용약관</a> · <a href="./community-guidelines.html">커뮤니티 이용규칙</a></p>
+
+  <h2>8. 방침 변경</h2>
+  <p>수집 항목, 이용 목적, 외부 SDK 또는 운영 사업자가 바뀌면 시행 전에 이 페이지를 갱신하고 중요한 변경은 앱 또는 스토어 공지로 알립니다.</p>
+
+  <footer>시행일: 2026년 8월 10일 · 문서 버전 1.1</footer>
+</main>
+</body>
+</html>

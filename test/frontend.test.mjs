@@ -69,6 +69,13 @@ test('online creation flow and compact controls are present', () => {
     'verificationBadge',
     'mapTitleInput',
     'authorNameInput',
+    'communityTermsCheck',
+    'communityHideMapBtn',
+    'communityHideAuthorBtn',
+    'communityReportBtn',
+    'communityDeleteBtn',
+    'reportOverlay',
+    'reportSubmitBtn',
     'pauseBtn',
   ]) {
     assert.match(html, new RegExp(`id="${id}"`));
@@ -76,6 +83,13 @@ test('online creation flow and compact controls are present', () => {
 
   assert.match(html, /apiRequest\('\/attempts'/);
   assert.match(html, /apiRequest\('\/maps'/);
+  assert.match(html, /termsVersion:COMMUNITY_TERMS_VERSION/);
+  assert.match(html, /if\(auth\)headers\['X-Author-Token'\]=ownerToken/);
+  assert.match(html, /apiRequest\(`\/maps\?sort=/);
+  assert.match(html, /\/report`,\{method:'POST'/);
+  assert.match(html, /\/delete`,\{method:'POST'/);
+  assert.match(html, /BLOCKED_MAPS_KEY/);
+  assert.match(html, /BLOCKED_AUTHORS_KEY/);
   assert.match(html, /맵이 바뀌어 다시 클리어해야 합니다/);
   assert.match(html, /#soundBtn,#restartBtn\{display:none!important\}/);
 });

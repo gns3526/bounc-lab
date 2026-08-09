@@ -1,4 +1,5 @@
 import { defineConfig, loadEnv } from 'vite';
+import { resolve } from 'node:path';
 
 const CONFIRMED_APP_NAME = 'penguin-bounce';
 
@@ -57,6 +58,14 @@ export default defineConfig(({ mode }) => {
       outDir: '../dist',
       emptyOutDir: true,
       target: 'es2020',
+      rollupOptions: {
+        input: {
+          index: resolve(process.cwd(), 'public/index.html'),
+          privacy: resolve(process.cwd(), 'public/privacy.html'),
+          terms: resolve(process.cwd(), 'public/terms.html'),
+          communityGuidelines: resolve(process.cwd(), 'public/community-guidelines.html'),
+        },
+      },
     },
     server: {
       host: '127.0.0.1',

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
@@ -9,6 +10,10 @@ import { createBounceServer } from '../server.mjs';
 const OWNER_TOKEN = 'owner-token-with-more-than-16-characters';
 const OTHER_TOKEN = 'different-owner-token-more-than-16-chars';
 const TEST_SECRET = 'test-only-publish-secret-at-least-32-bytes';
+const TERMS_VERSION = '2026-08-10-v1';
+const MODERATION_TOKEN = createHmac('sha256', TEST_SECRET)
+  .update('bounce-moderation-v1')
+  .digest('base64url');
 const VALID_REPLAY = Object.freeze({
   version: 1,
   engineVersion: 'bounce-physics-v1',
@@ -39,6 +44,7 @@ async function startFixture(t, options = {}) {
     publicDirectory,
     dataFile,
     publishSecret: TEST_SECRET,
+    moderationToken: MODERATION_TOKEN,
     ...options,
   });
   await new Promise((accept, reject) => {
@@ -77,7 +83,7 @@ async function publishMap(baseUrl, map, { token = OWNER_TOKEN, title = '테스�
   });
   assert.equal(complete.response.status, 200, complete.text);
   const published = await api(baseUrl, '/api/maps', {
-    method: 'POST', token, body: { map, title, author, publishTicket: complete.json.publishTicket },
+    method: 'POST', token, body: { map, title, author, publishTicket: complete.json.publishTicket, termsVersion: TERMS_VERSION },
   });
   assert.equal(published.response.status, 201, published.text);
   return { attempt, complete, published };
@@ -105,6 +111,17 @@ test('health endpoint and static file serving work', async (t) => {
   const missingApi = await api(baseUrl, '/api/nope');
   assert.equal(missingApi.response.status, 404);
   assert.equal(missingApi.json.error.code, 'API_NOT_FOUND');
+});
+
+test('production refuses to start without independent strong secrets', async () => {
+  await assert.rejects(
+    createBounceServer({ nodeEnv: 'production', publishSecret: '', moderationToken: MODERATION_TOKEN }),
+    /PUBLISH_SECRET must be a 32-512 character secret/,
+  );
+  await assert.rejects(
+    createBounceServer({ nodeEnv: 'production', publishSecret: TEST_SECRET, moderationToken: '' }),
+    /MODERATION_TOKEN must be a 32-512 character secret/,
+  );
 });
 
 test('CORS preflight allows SDK3 Toss and explicitly configured origins', async (t) => {
@@ -181,6 +198,22 @@ test('API rate limiting returns a retry hint', async (t) => {
   assert.ok(Number(limited.response.headers.get('retry-after')) >= 1);
 });
 
+test('trusted proxy rate limiting uses the nearest forwarded client address', async (t) => {
+  const { baseUrl } = await startFixture(t, { generalRateLimit: 1, trustProxy: true });
+  const first = await api(baseUrl, '/api/health', {
+    headers: { 'X-Forwarded-For': '203.0.113.1, 198.51.100.7' },
+  });
+  assert.equal(first.response.status, 200);
+  const sameClient = await api(baseUrl, '/api/health', {
+    headers: { 'X-Forwarded-For': '203.0.113.99, 198.51.100.7' },
+  });
+  assert.equal(sameClient.response.status, 429, 'spoofing the leftmost address must not evade the limit');
+  const otherClient = await api(baseUrl, '/api/health', {
+    headers: { 'X-Forwarded-For': '198.51.100.8' },
+  });
+  assert.equal(otherClient.response.status, 200);
+});
+
 test('only the same owner can complete an attempt and publish its exact map once', async (t) => {
   const { baseUrl } = await startFixture(t);
   const map = makeMap();
@@ -240,6 +273,7 @@ test('only the same owner can complete an attempt and publish its exact map once
       title: '바뀐 맵',
       author: '테스터',
       publishTicket: completion.json.publishTicket,
+      termsVersion: TERMS_VERSION,
     },
   });
   assert.equal(changedPublish.response.status, 409);
@@ -253,10 +287,20 @@ test('only the same owner can complete an attempt and publish its exact map once
       title: '훔친 맵',
       author: '다른 사람',
       publishTicket: completion.json.publishTicket,
+      termsVersion: TERMS_VERSION,
     },
   });
   assert.equal(wrongOwnerPublish.response.status, 403);
   assert.equal(wrongOwnerPublish.json.error.code, 'TICKET_OWNER_MISMATCH');
+
+  const missingTerms = await api(baseUrl, '/api/maps', {
+    method: 'POST',
+    token: OWNER_TOKEN,
+    body: { map, title: '동의 전 맵', author: '테스터', publishTicket: completion.json.publishTicket },
+  });
+  assert.equal(missingTerms.response.status, 400);
+  assert.equal(missingTerms.json.error.code, 'TERMS_ACCEPTANCE_REQUIRED');
+  assert.equal(missingTerms.json.error.details.termsVersion, TERMS_VERSION);
 
   const publish = await api(baseUrl, '/api/maps', {
     method: 'POST',
@@ -266,12 +310,15 @@ test('only the same owner can complete an attempt and publish its exact map once
       title: ' <b>멋진</b>   맵 ',
       author: ' 펭귄\n왕 ',
       publishTicket: completion.json.publishTicket,
+      termsVersion: TERMS_VERSION,
     },
   });
   assert.equal(publish.response.status, 201, publish.text);
   assert.equal(publish.json.map.title, '멋진 맵');
   assert.equal(publish.json.map.author, '펭귄 왕');
   assert.deepEqual(publish.json.map.map, map);
+  assert.match(publish.json.map.authorId, /^[A-Za-z0-9_-]{22}$/);
+  assert.equal('ownerHash' in publish.json.map, false);
 
   const reuse = await api(baseUrl, '/api/maps', {
     method: 'POST',
@@ -281,6 +328,7 @@ test('only the same owner can complete an attempt and publish its exact map once
       title: '복제 맵',
       author: '테스터',
       publishTicket: completion.json.publishTicket,
+      termsVersion: TERMS_VERSION,
     },
   });
   assert.equal(reuse.response.status, 409);
@@ -292,7 +340,7 @@ test('only the same owner can complete an attempt and publish its exact map once
   const tampered = await api(baseUrl, '/api/maps', {
     method: 'POST',
     token: OWNER_TOKEN,
-    body: { map, title: '위조', author: '위조', publishTicket: tamperedTicket },
+    body: { map, title: '위조', author: '위조', publishTicket: tamperedTicket, termsVersion: TERMS_VERSION },
   });
   assert.equal(tampered.response.status, 401);
   assert.equal(tampered.json.error.code, 'INVALID_PUBLISH_TICKET');
@@ -362,6 +410,168 @@ test('map validation rejects malformed grids, blocked spawn/exit, and missing ow
   });
   assert.equal(tooLarge.response.status, 413);
   assert.equal(tooLarge.json.error.code, 'BODY_TOO_LARGE');
+});
+
+test('community reports, author-wide moderation, and owner deletion protect public maps', async (t) => {
+  const { baseUrl } = await startFixture(t);
+  const map = makeMap();
+  const first = await publishMap(baseUrl, map, { title: '신고 대상 1', author: '같은 제작자' });
+  const second = await publishMap(baseUrl, map, { title: '신고 대상 2', author: '같은 제작자' });
+  const firstMap = first.published.json.map;
+  const secondMap = second.published.json.map;
+  assert.equal(firstMap.authorId, secondMap.authorId, 'one private owner must have one stable public author id');
+  assert.equal('ownerHash' in firstMap, false);
+
+  const invalidOther = await api(baseUrl, `/api/maps/${firstMap.id}/report`, {
+    method: 'POST', token: OTHER_TOKEN, body: { scope: 'map', reason: 'other', detail: '' },
+  });
+  assert.equal(invalidOther.response.status, 400);
+  assert.equal(invalidOther.json.error.code, 'REPORT_DETAIL_REQUIRED');
+
+  const report = await api(baseUrl, `/api/maps/${firstMap.id}/report`, {
+    method: 'POST',
+    token: OTHER_TOKEN,
+    body: { scope: 'author', reason: 'abuse', detail: '제작자 표시명을 확인해 주세요.' },
+  });
+  assert.equal(report.response.status, 201, report.text);
+  assert.match(report.json.report.id, /^report_[A-Za-z0-9_-]+$/);
+  assert.equal('reporterId' in report.json.report, false);
+
+  const duplicate = await api(baseUrl, `/api/maps/${firstMap.id}/report`, {
+    method: 'POST',
+    token: OTHER_TOKEN,
+    body: { scope: 'author', reason: 'spam', detail: '같은 신고 대상' },
+  });
+  assert.equal(duplicate.response.status, 200);
+  assert.equal(duplicate.json.duplicate, true);
+  assert.equal(duplicate.json.report.id, report.json.report.id);
+
+  const unauthenticatedQueue = await api(baseUrl, '/api/moderation/reports');
+  assert.equal(unauthenticatedQueue.response.status, 401);
+  assert.equal(unauthenticatedQueue.json.error.code, 'MODERATION_AUTH_REQUIRED');
+  const deniedQueue = await api(baseUrl, '/api/moderation/reports', {
+    headers: { 'X-Moderation-Token': 'wrong-token' },
+  });
+  assert.equal(deniedQueue.response.status, 403);
+  assert.equal(deniedQueue.json.error.code, 'MODERATION_AUTH_DENIED');
+
+  const queue = await api(baseUrl, '/api/moderation/reports', {
+    headers: { 'X-Moderation-Token': MODERATION_TOKEN },
+  });
+  assert.equal(queue.response.status, 200, queue.text);
+  assert.equal(queue.json.reports.length, 1);
+  assert.equal(queue.json.reports[0].mapId, firstMap.id);
+  assert.equal('reporterId' in queue.json.reports[0], false);
+
+  const wrongDelete = await api(baseUrl, `/api/maps/${firstMap.id}/delete`, {
+    method: 'POST', token: OTHER_TOKEN, body: {},
+  });
+  assert.equal(wrongDelete.response.status, 403);
+  assert.equal(wrongDelete.json.error.code, 'MAP_OWNER_MISMATCH');
+
+  const moderated = await api(baseUrl, `/api/moderation/reports/${report.json.report.id}`, {
+    method: 'POST',
+    headers: { 'X-Moderation-Token': MODERATION_TOKEN },
+    body: { action: 'hide_author' },
+  });
+  assert.equal(moderated.response.status, 200, moderated.text);
+  assert.deepEqual(new Set(moderated.json.affectedMapIds), new Set([firstMap.id, secondMap.id]));
+  for (const id of [firstMap.id, secondMap.id]) {
+    const hidden = await api(baseUrl, `/api/maps/${id}`);
+    assert.equal(hidden.response.status, 404);
+    const counter = await api(baseUrl, `/api/maps/${id}/play`, { method: 'POST', body: {} });
+    assert.equal(counter.response.status, 404);
+  }
+  const publicList = await api(baseUrl, '/api/maps');
+  assert.equal(publicList.json.pagination.total, 0);
+
+  const blockedAttempt = await api(baseUrl, '/api/attempts', {
+    method: 'POST', token: OWNER_TOKEN, body: { map },
+  });
+  const blockedComplete = await api(baseUrl, `/api/attempts/${blockedAttempt.json.attemptId}/complete`, {
+    method: 'POST', token: OWNER_TOKEN, body: { replay: VALID_REPLAY },
+  });
+  const blockedPublish = await api(baseUrl, '/api/maps', {
+    method: 'POST',
+    token: OWNER_TOKEN,
+    body: {
+      map,
+      title: 'moderated author retry',
+      author: 'same author',
+      publishTicket: blockedComplete.json.publishTicket,
+      termsVersion: TERMS_VERSION,
+    },
+  });
+  assert.equal(blockedPublish.response.status, 403, blockedPublish.text);
+  assert.equal(blockedPublish.json.error.code, 'AUTHOR_PUBLISH_BLOCKED');
+
+  const resolvedQueue = await api(baseUrl, '/api/moderation/reports?status=resolved', {
+    headers: { 'X-Moderation-Token': MODERATION_TOKEN },
+  });
+  assert.equal(resolvedQueue.json.reports[0].resolution, 'hide_author');
+
+  const deleted = await api(baseUrl, `/api/maps/${firstMap.id}/delete`, {
+    method: 'POST', token: OWNER_TOKEN, body: {},
+  });
+  assert.equal(deleted.response.status, 200, deleted.text);
+  assert.equal(deleted.json.deleted, true);
+});
+
+test('report rate limiting is independent and returns a retry hint', async (t) => {
+  const { baseUrl } = await startFixture(t, { reportRateLimit: 1, reportRateWindowMs: 60_000 });
+  const { published } = await publishMap(baseUrl, makeMap());
+  const id = published.json.map.id;
+  const first = await api(baseUrl, `/api/maps/${id}/report`, {
+    method: 'POST', token: OTHER_TOKEN, body: { scope: 'map', reason: 'spam' },
+  });
+  assert.equal(first.response.status, 201, first.text);
+  const limited = await api(baseUrl, `/api/maps/${id}/report`, {
+    method: 'POST', token: OWNER_TOKEN, body: { scope: 'map', reason: 'abuse' },
+  });
+  assert.equal(limited.response.status, 429);
+  assert.equal(limited.json.error.code, 'RATE_LIMITED');
+  assert.ok(Number(limited.response.headers.get('retry-after')) >= 1);
+});
+
+test('version 1 map storage migrates without exposing a legacy owner hash', async (t) => {
+  const { baseUrl, server, dataFile, publicDirectory } = await startFixture(t);
+  const { published } = await publishMap(baseUrl, makeMap(), { title: '이전 저장 맵' });
+  const id = published.json.map.id;
+  const state = JSON.parse(await readFile(dataFile, 'utf8'));
+  const legacyMaps = state.maps.map((record) => {
+    const { ownerHash, authorId, termsVersion, status, moderatedAt, ...legacy } = record;
+    return legacy;
+  });
+  await new Promise((accept) => server.close(accept));
+  await writeFile(dataFile, JSON.stringify({ version: 1, maps: legacyMaps }), 'utf8');
+
+  const restarted = await createBounceServer({ dataFile, publicDirectory, publishSecret: TEST_SECRET });
+  await new Promise((accept, reject) => {
+    restarted.once('error', reject);
+    restarted.listen(0, '127.0.0.1', accept);
+  });
+  t.after(async () => {
+    if (restarted.listening) await new Promise((accept) => restarted.close(accept));
+  });
+  const restartedUrl = `http://127.0.0.1:${restarted.address().port}`;
+  const detail = await api(restartedUrl, `/api/maps/${id}`);
+  assert.equal(detail.response.status, 200, detail.text);
+  assert.match(detail.json.map.authorId, /^[A-Za-z0-9_-]{22}$/);
+  assert.equal('ownerHash' in detail.json.map, false);
+  const legacyDelete = await api(restartedUrl, `/api/maps/${id}/delete`, {
+    method: 'POST', token: OWNER_TOKEN, body: {},
+  });
+  assert.equal(legacyDelete.response.status, 403, 'v1 records have no trustworthy owner credential');
+  const migratedState = JSON.parse(await readFile(dataFile, 'utf8'));
+  assert.equal(migratedState.version, 3);
+  assert.deepEqual(migratedState.blockedAuthors, []);
+
+  await new Promise((accept) => restarted.close(accept));
+  await writeFile(dataFile, JSON.stringify({ ...migratedState, version: 999 }), 'utf8');
+  await assert.rejects(
+    createBounceServer({ dataFile, publicDirectory, publishSecret: TEST_SECRET }),
+    /Unsupported maps\.json version: 999/,
+  );
 });
 
 test('published maps can be searched, counted concurrently, and loaded after restart', async (t) => {
