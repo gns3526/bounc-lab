@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const tossBridge = await readFile(new URL('../public/toss-bridge.js', import.meta.url), 'utf8');
+const staticHeaders = await readFile(new URL('../public/_headers', import.meta.url), 'utf8');
 
 function frontendFunction(name, nextName) {
   const start = html.indexOf(`  function ${name}(`);
@@ -58,6 +59,14 @@ test('single-file frontend parses and keeps DOM ids unique', () => {
 
   const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
   assert.equal(new Set(ids).size, ids.length, 'DOM id values must be unique');
+});
+
+test('Cloudflare static assets keep browser security headers', () => {
+  assert.match(staticHeaders, /X-Content-Type-Options:\s*nosniff/i);
+  assert.match(staticHeaders, /X-Frame-Options:\s*SAMEORIGIN/i);
+  assert.match(staticHeaders, /Referrer-Policy:\s*same-origin/i);
+  assert.match(staticHeaders, /Content-Security-Policy:/i);
+  assert.match(staticHeaders, /connect-src 'self'/);
 });
 
 test('online creation flow and compact controls are present', () => {
@@ -129,10 +138,16 @@ test('mobile editor keeps essential controls readable and accessible', () => {
 
 test('Apps in Toss hooks cover identity, sharing, safe layout, and confirmed exit', () => {
   assert.match(html, /meta name="api-base-url"/);
+  assert.match(html, /meta name="public-app-url"/);
   assert.match(html, /html\.toss-miniapp #app/);
   assert.match(html, /--toss-safe-top/);
   assert.match(html, /addEventListener\('bounc:toss-ready'/);
   assert.match(html, /window\.__BOUNC_TOSS__\?\.shareMap/);
+  assert.match(html, /const publicAppUrl=.*meta\[name="public-app-url"\]/);
+  assert.match(html, /MAX_VERIFICATION_REPLAY_TICKS\s*=\s*120\s*\*\s*60\s*;/);
+  assert.match(html, /replay\.totalTicks>=MAX_VERIFICATION_REPLAY_TICKS/);
+  assert.match(html, /맵 게시용 클리어는 1분 안에 완료해야 합니다/);
+  assert.match(html, /new URL\(publicAppUrl\|\|location\.href,location\.href\)/);
   assert.match(html, /addEventListener\('bounc:toss-back',openExitDialog\)/);
   assert.match(html, /id="exitOverlay" role="dialog" aria-modal="true"/);
   assert.match(html, /document\.hidden/);

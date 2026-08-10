@@ -51,23 +51,30 @@ test('Android native project allows both orientations, signs releases, and targe
   assert.match(buildGradle, /rootProject\.file\('keystore\.properties'\)/);
   assert.match(buildGradle, /signingConfig signingConfigs\.release/);
   assert.match(buildGradle, /gradle\.taskGraph\.whenReady/);
-  assert.match(buildGradle, /keystore\.properties is required for every release build/);
+  assert.match(buildGradle, /Release signing credentials are required for every release build/);
+  assert.match(buildGradle, /PENGUIN_SIGNING_CREDENTIALS_FILE/);
+  assert.match(buildGradle, /PENGUIN_SIGNING_PROFILE/);
   assert.match(keystoreExample, /storeFile=/);
   assert.ok(launcher.byteLength > 30_000, 'launcher icon should contain Penguin Bounce artwork');
   assert.ok(splash.byteLength > 100_000, 'splash should contain Penguin Bounce artwork');
 });
 
-test('Android release validation requires a public HTTPS API', () => {
+test('Android release validation requires public HTTPS API and share URLs', () => {
   const script = fileURLToPath(new URL('scripts/validate-android-release.mjs', projectRootUrl));
-  const baseEnvironment = { ...process.env, VITE_API_BASE_URL: '' };
+  const baseEnvironment = { ...process.env, VITE_API_BASE_URL: '', VITE_PUBLIC_APP_URL: '' };
 
   const missing = spawnSync(process.execPath, [script], { cwd: projectRoot, env: baseEnvironment, encoding: 'utf8' });
   assert.notEqual(missing.status, 0);
   assert.match(missing.stderr, /VITE_API_BASE_URL is required/);
+  assert.match(missing.stderr, /VITE_PUBLIC_APP_URL is required/);
 
   const insecure = spawnSync(process.execPath, [script], {
     cwd: projectRoot,
-    env: { ...baseEnvironment, VITE_API_BASE_URL: 'http://api.example.com' },
+    env: {
+      ...baseEnvironment,
+      VITE_API_BASE_URL: 'http://penguin-bounce-release.workers.dev',
+      VITE_PUBLIC_APP_URL: 'https://penguin-bounce-release.workers.dev',
+    },
     encoding: 'utf8',
   });
   assert.notEqual(insecure.status, 0);
@@ -75,11 +82,56 @@ test('Android release validation requires a public HTTPS API', () => {
 
   const valid = spawnSync(process.execPath, [script], {
     cwd: projectRoot,
-    env: { ...baseEnvironment, VITE_API_BASE_URL: 'https://api.example.com' },
+    env: {
+      ...baseEnvironment,
+      VITE_API_BASE_URL: 'https://penguin-bounce-release.workers.dev',
+      VITE_PUBLIC_APP_URL: 'https://penguin-bounce-release.workers.dev',
+    },
     encoding: 'utf8',
   });
   assert.equal(valid.status, 0, valid.stderr);
   assert.match(valid.stdout, /Android release validation passed/);
+
+  const localShareUrl = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: {
+      ...baseEnvironment,
+      VITE_API_BASE_URL: 'https://penguin-bounce-release.workers.dev',
+      VITE_PUBLIC_APP_URL: 'https://localhost',
+    },
+    encoding: 'utf8',
+  });
+  assert.notEqual(localShareUrl.status, 0);
+  assert.match(localShareUrl.stderr, /VITE_PUBLIC_APP_URL must point to a public host/);
+});
+
+test('Toss validation checks a configured browser fallback URL while preserving intoss sharing', async () => {
+  const script = fileURLToPath(new URL('scripts/validate-toss-release.mjs', projectRootUrl));
+  const baseEnvironment = {
+    ...process.env,
+    VITE_API_BASE_URL: 'https://penguin-bounce-release.workers.dev',
+    VITE_PUBLIC_APP_URL: '',
+    TOSS_APP_NAME: 'penguin-bounce',
+  };
+
+  const localShareUrl = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_PUBLIC_APP_URL: 'https://localhost' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(localShareUrl.status, 0);
+  assert.match(localShareUrl.stderr, /VITE_PUBLIC_APP_URL must point to a public host/);
+
+  const valid = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_PUBLIC_APP_URL: 'https://penguin-bounce-release.workers.dev' },
+    encoding: 'utf8',
+  });
+  assert.equal(valid.status, 0, valid.stderr);
+
+  const tossBridge = await readText('public/toss-bridge.js');
+  assert.match(tossBridge, /intoss:\/\//);
+  assert.match(tossBridge, /Share\.createLink/);
 });
 
 test('Android secrets stay ignored and privacy policy reflects actual online data flow', async () => {
@@ -100,10 +152,17 @@ test('Android secrets stay ignored and privacy policy reflects actual online dat
   assert.match(privacy, /요청 횟수 제한/);
   assert.match(privacy, /내 맵 삭제/);
   assert.match(privacy, /신고 정보/);
+  assert.match(privacy, /Cloudflare Workers/);
+  assert.match(privacy, /Cloudflare D1/);
+  assert.match(privacy, /대한민국 외 지역/);
+  assert.match(privacy, /Time Travel 복구 지점에는 삭제·수정 전 데이터가 최대 7일간/);
+  assert.match(privacy, /IP 주소 원문 대신 SHA-256/);
   assert.match(privacy, /hoon@jellysnow\.com/);
   assert.match(releaseGuide, /최초 등록·업로드하기 전까지만/);
   assert.match(releaseGuide, /ALLOWED_ORIGINS/);
   assert.match(viteConfig, /privacy:\s*resolve\(process\.cwd\(\), 'public\/privacy\.html'\)/);
   assert.match(viteConfig, /terms:\s*resolve\(process\.cwd\(\), 'public\/terms\.html'\)/);
   assert.match(viteConfig, /communityGuidelines:\s*resolve\(process\.cwd\(\), 'public\/community-guidelines\.html'\)/);
+  assert.match(viteConfig, /VITE_PUBLIC_APP_URL/);
+  assert.match(viteConfig, /'public-app-url'/);
 });

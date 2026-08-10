@@ -15,6 +15,7 @@ const confirmedAppName = 'penguin-bounce';
 const explicitAppName = env.TOSS_APP_NAME?.trim();
 const appName = explicitAppName || confirmedAppName;
 const apiBaseUrl = env.VITE_API_BASE_URL?.trim() || '';
+const publicAppUrl = env.VITE_PUBLIC_APP_URL?.trim() || '';
 
 function requireExactVersion(actual, expected, label) {
   if (actual !== expected) {
@@ -22,46 +23,47 @@ function requireExactVersion(actual, expected, label) {
   }
 }
 
-function validateAbsoluteUrl(value, { requireHttps }) {
+function validateAbsoluteUrl(value, { requireHttps, variableName }) {
   let url;
   try {
     url = new URL(value);
   } catch {
-    errors.push('VITE_API_BASE_URL must be an absolute URL.');
+    errors.push(`${variableName} must be an absolute URL.`);
     return;
   }
 
   if (url.username || url.password) {
-    errors.push('VITE_API_BASE_URL must not contain credentials.');
+    errors.push(`${variableName} must not contain credentials.`);
   }
   if (url.search || url.hash) {
-    errors.push('VITE_API_BASE_URL must not contain a query string or fragment.');
+    errors.push(`${variableName} must not contain a query string or fragment.`);
   }
   if (requireHttps && url.protocol !== 'https:') {
-    errors.push('VITE_API_BASE_URL must use https:// for a production Toss build.');
+    errors.push(`${variableName} must use https:// for a production Toss build.`);
   }
   if (!requireHttps && !['http:', 'https:'].includes(url.protocol)) {
-    errors.push('VITE_API_BASE_URL must use http:// or https://.');
+    errors.push(`${variableName} must use http:// or https://.`);
   }
 
   const hostname = url.hostname.toLowerCase();
   const placeholderHost =
-    hostname === 'example.com' ||
-    hostname.endsWith('.example.com') ||
+    ['example.com', 'example.net', 'example.org'].some(
+      (exampleHost) => hostname === exampleHost || hostname.endsWith(`.${exampleHost}`),
+    ) ||
     hostname.endsWith('.example') ||
     hostname.endsWith('.invalid') ||
     hostname.endsWith('.test');
   if (requireHttps && placeholderHost) {
-    errors.push('VITE_API_BASE_URL must use the deployed public API host, not a placeholder domain.');
+    errors.push(`${variableName} must use a deployed public host, not a placeholder domain.`);
   }
   if (
     requireHttps &&
     (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname.endsWith('.local'))
   ) {
-    errors.push('VITE_API_BASE_URL must point to a public API host, not localhost.');
+    errors.push(`${variableName} must point to a public host, not localhost.`);
   }
   if (value.endsWith('/')) {
-    warnings.push('VITE_API_BASE_URL ends with "/"; the Vite build will remove it.');
+    warnings.push(`${variableName} ends with "/"; the Vite build will remove it.`);
   }
 }
 
@@ -90,7 +92,18 @@ if (!apiBaseUrl) {
     errors.push('VITE_API_BASE_URL is required for a production Toss build.');
   }
 } else {
-  validateAbsoluteUrl(apiBaseUrl, { requireHttps: !isDevelopment });
+  validateAbsoluteUrl(apiBaseUrl, { requireHttps: !isDevelopment, variableName: 'VITE_API_BASE_URL' });
+}
+
+if (publicAppUrl) {
+  validateAbsoluteUrl(publicAppUrl, {
+    requireHttps: !isDevelopment,
+    variableName: 'VITE_PUBLIC_APP_URL',
+  });
+} else if (!isDevelopment) {
+  warnings.push(
+    'VITE_PUBLIC_APP_URL is empty; Toss intoss sharing still works, but non-Toss browser fallback links use the current page.',
+  );
 }
 
 for (const warning of warnings) console.warn(`Toss release warning: ${warning}`);

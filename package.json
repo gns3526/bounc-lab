@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Bounce Ball game and clear-gated community map server",
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "start": "node server.mjs",
@@ -21,7 +21,11 @@
     "build:android:apk": "npm run sync:android && cd android && gradlew.bat assembleRelease",
     "build:toss:dev": "node scripts/validate-toss-release.mjs --development && vite build --mode toss-dev && ait build",
     "build:toss": "node scripts/validate-toss-release.mjs && vite build --mode toss && ait build",
-    "deploy:toss": "npm run build:toss && ait deploy"
+    "deploy:toss": "npm run build:toss && ait deploy",
+    "dev:cloudflare": "wrangler dev --config cloudflare/wrangler.toml",
+    "migrate:cloudflare:local": "wrangler d1 migrations apply penguin-bounce-prod --local --config cloudflare/wrangler.toml",
+    "migrate:cloudflare": "wrangler d1 migrations apply penguin-bounce-prod --remote --config cloudflare/wrangler.toml",
+    "deploy:cloudflare": "wrangler deploy --config cloudflare/wrangler.toml"
   },
   "dependencies": {
     "@apps-in-toss/web-framework": "3.0.2",
@@ -31,6 +35,12 @@
   "devDependencies": {
     "@capacitor/cli": "8.5.0",
     "typescript": "7.0.2",
-    "vite": "8.2.1"
+    "vite": "8.2.1",
+    "wrangler": "4.120.0"
+  },
+  "overrides": {
+    "xcode": {
+      "uuid": "11.1.1"
+    }
   }
 }

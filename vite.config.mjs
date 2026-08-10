@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => {
   const env = { ...sharedTossEnv, ...loadEnv(mode, process.cwd(), '') };
   const appName = (env.TOSS_APP_NAME || CONFIRMED_APP_NAME).trim();
   const apiBaseUrl = (env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+  const publicAppUrl = (env.VITE_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
   const localApiProxy = (env.LOCAL_API_PROXY_URL || 'http://127.0.0.1:8787').trim();
 
   return {
@@ -86,18 +87,25 @@ export default defineConfig(({ mode }) => {
           order: 'pre',
           handler(html) {
             const apiMeta = setMetaContent(html, 'api-base-url', apiBaseUrl);
+            const publicAppMeta = setMetaContent(apiMeta.html, 'public-app-url', publicAppUrl);
             const transformedHtml = isTossBuild
-              ? addHtmlClass(apiMeta.html, 'toss-miniapp')
-              : apiMeta.html;
-            const tags = apiMeta.found
-              ? []
-              : [
-                  {
-                    tag: 'meta',
-                    attrs: { name: 'api-base-url', content: apiBaseUrl },
-                    injectTo: 'head-prepend',
-                  },
-                ];
+              ? addHtmlClass(publicAppMeta.html, 'toss-miniapp')
+              : publicAppMeta.html;
+            const tags = [];
+            if (!apiMeta.found) {
+              tags.push({
+                tag: 'meta',
+                attrs: { name: 'api-base-url', content: apiBaseUrl },
+                injectTo: 'head-prepend',
+              });
+            }
+            if (!publicAppMeta.found) {
+              tags.push({
+                tag: 'meta',
+                attrs: { name: 'public-app-url', content: publicAppUrl },
+                injectTo: 'head-prepend',
+              });
+            }
 
             if (isTossBuild) {
               tags.push(

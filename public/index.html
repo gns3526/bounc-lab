@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="api-base-url" content="" />
+  <meta name="public-app-url" content="" />
   <meta name="theme-color" content="#dff7ff" />
   <title>BOUNC LAB — 만들고, 깨고, 공유하는 펭귄 바운스</title>
   <style>
@@ -799,6 +800,7 @@
   const WORLD_H = 480;
   const STEP = 1 / 120;
   const REPLAY_ENGINE_VERSION = 'bounce-physics-v1';
+  const MAX_VERIFICATION_REPLAY_TICKS = 120 * 60;
 
   // 원작 맵의 한 칸 높이와 폭탄 천장 간격에 맞춘 고정 바운드 수치.
   // 조이스틱/터치 입력은 이 값에 전혀 관여하지 않고 좌우 이동만 담당한다.
@@ -3009,6 +3011,7 @@
   }
 
   const apiBase=(document.querySelector('meta[name="api-base-url"]')?.content||'').trim().replace(/\/+$/,'');
+  const publicAppUrl=(document.querySelector('meta[name="public-app-url"]')?.content||'').trim().replace(/\/+$/,'');
 
   async function apiRequest(path,{method='GET',body,signal,auth=false}={}){
     const headers={Accept:'application/json'};
@@ -3119,6 +3122,7 @@
     if(!activeAttempt||!customMode||playContext!=='draft-test')return;
     if(!activeAttempt.replay)resetVerificationReplay();
     const replay=activeAttempt.replay;
+    if(replay.totalTicks>=MAX_VERIFICATION_REPLAY_TICKS){replay.tooLong=true;return;}
     const dir=(input.right?1:0)-(input.left?1:0);
     recordVerificationDirection(dir);
     replay.totalTicks++;
@@ -3156,6 +3160,10 @@
   async function completeVerificationAttempt(){
     const attempt=activeAttempt;
     if(!attempt)return null;
+    if(attempt.replay?.tooLong){
+      const message='맵 게시용 클리어는 1분 안에 완료해야 합니다. 맵을 조금 줄이거나 지름길을 만든 뒤 다시 검증해 주세요.';
+      activeAttempt=null;updateVerificationUI(message);setEditorStatus(message,'error');return null;
+    }
     const clearStats={bounds:boundCount,time:Number(stageTime.toFixed(3)),deaths:deathsThisStage};
     const replay=verificationReplayPayload(attempt.replay);
     if(!replay){activeAttempt=null;updateVerificationUI('플레이 기록을 확인할 수 없습니다. 다시 검증해주세요.');return null;}
@@ -3211,7 +3219,7 @@
 
   async function shareMap(item){
     if(!item?.id)return;
-    const url=new URL(location.href);url.search='';url.searchParams.set('map',item.id);url.hash='';
+    const url=new URL(publicAppUrl||location.href,location.href);url.search='';url.searchParams.set('map',item.id);url.hash='';
     const shareData={title:`${item.title||'BOUNC LAB 맵'} · BOUNC LAB`,text:`${item.authorName||item.author||'펭귄'} 제작 맵에 도전해보세요!`,url:url.href};
     try{
       if(window.__BOUNC_TOSS__?.shareMap){

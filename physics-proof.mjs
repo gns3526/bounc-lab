@@ -2,7 +2,8 @@
 // A replay contains only digital direction changes; the server owns all physics state.
 export const REPLAY_ENGINE_VERSION = 'bounce-physics-v1';
 export const REPLAY_HZ = 120;
-export const MAX_REPLAY_TICKS = REPLAY_HZ * 60 * 5;
+// Leave CPU headroom for Cloudflare Workers Free replay verification.
+export const MAX_REPLAY_TICKS = REPLAY_HZ * 60;
 export const MAX_REPLAY_EVENTS = 4096;
 
 const TILE = 32;
@@ -144,22 +145,21 @@ function isSolid(tile) {
   return tile >= 1 && tile <= 6;
 }
 
-function exitSegments(simulation) {
-  const segments = [];
+function exitSegmentNearY(simulation, y, tolerance = 0) {
   let start = -1;
   for (let row = 0; row <= 15; row += 1) {
     const open = row < 15 && simulation.grid[row]?.[19] === 0;
     if (open && start < 0) start = row;
     if (!open && start >= 0) {
-      segments.push({ start, end: row - 1, top: start * TILE, bottom: row * TILE });
+      const top = start * TILE;
+      const bottom = row * TILE;
+      if (y >= top - tolerance && y <= bottom + tolerance) {
+        return { start, end: row - 1, top, bottom };
+      }
       start = -1;
     }
   }
-  return segments;
-}
-
-function exitSegmentNearY(simulation, y, tolerance = 0) {
-  return exitSegments(simulation).find((segment) => y >= segment.top - tolerance && y <= segment.bottom + tolerance) ?? null;
+  return null;
 }
 
 function isClimbableWallTile(tile) {
@@ -264,7 +264,10 @@ function resolveHorizontal(simulation) {
   let hitTile = 0;
   let hitRow = -1;
   let hitColumn = -1;
-  const exitPass = player.vx > 0 ? exitSegmentNearY(simulation, player.y, EXIT_CORNER_TOLERANCE) : null;
+  const checksExitColumn = minColumn <= 19 && maxColumn >= 19;
+  const exitPass = player.vx > 0 && checksExitColumn
+    ? exitSegmentNearY(simulation, player.y, EXIT_CORNER_TOLERANCE)
+    : null;
   for (let row = minRow; row <= maxRow; row += 1) {
     for (let column = minColumn; column <= maxColumn; column += 1) {
       const tile = tileAt(simulation, row, column);
@@ -443,18 +446,23 @@ function simulateStep(simulation) {
   resolveVertical(simulation);
   if (checkBombs(simulation)) return;
 
-  const atExitY = !!exitSegmentNearY(simulation, simulation.player.y, EXIT_CORNER_TOLERANCE);
-  if (simulation.player.vx > 0 && simulation.player.x + simulation.player.rx >= WORLD_WIDTH - 2 && atExitY) {
-    simulation.cleared = true;
-    return;
-  }
-  if (simulation.player.x > WORLD_WIDTH + simulation.player.rx * 0.25) {
-    if (atExitY) {
+  const crossingExitBoundary = simulation.player.vx > 0
+    && simulation.player.x + simulation.player.rx >= WORLD_WIDTH - 2;
+  const outsideRightBoundary = simulation.player.x > WORLD_WIDTH + simulation.player.rx * 0.25;
+  if (crossingExitBoundary || outsideRightBoundary) {
+    const atExitY = !!exitSegmentNearY(simulation, simulation.player.y, EXIT_CORNER_TOLERANCE);
+    if (crossingExitBoundary && atExitY) {
       simulation.cleared = true;
       return;
     }
-    simulation.player.x = WORLD_WIDTH - simulation.player.rx;
-    simulation.player.vx = -Math.max(110, Math.abs(simulation.player.vx) * 0.7);
+    if (outsideRightBoundary) {
+      if (atExitY) {
+        simulation.cleared = true;
+        return;
+      }
+      simulation.player.x = WORLD_WIDTH - simulation.player.rx;
+      simulation.player.vx = -Math.max(110, Math.abs(simulation.player.vx) * 0.7);
+    }
   }
   if (simulation.player.x < simulation.player.rx) {
     const edgeImpact = Math.abs(simulation.player.vx);

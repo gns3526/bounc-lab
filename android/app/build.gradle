@@ -1,13 +1,44 @@
 apply plugin: 'com.android.application'
 
+import groovy.json.JsonSlurper
+
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('keystore.properties')
-def hasReleaseSigning = keystorePropertiesFile.exists()
-if (hasReleaseSigning) {
+def signingProfile = System.getenv('PENGUIN_SIGNING_PROFILE')?.trim()
+def signingCredentialsPath = System.getenv('PENGUIN_SIGNING_CREDENTIALS_FILE')?.trim()
+if ((signingProfile && !signingCredentialsPath) || (!signingProfile && signingCredentialsPath)) {
+    throw new GradleException('PENGUIN_SIGNING_PROFILE and PENGUIN_SIGNING_CREDENTIALS_FILE must be set together')
+}
+def hasExternalSigning = signingProfile && signingCredentialsPath
+
+if (hasExternalSigning) {
+    def signingCredentialsFile = file(signingCredentialsPath)
+    if (!signingCredentialsFile.exists()) {
+        throw new GradleException('PENGUIN_SIGNING_CREDENTIALS_FILE does not exist')
+    }
+    def signingCredentials = new JsonSlurper().parse(signingCredentialsFile)
+    def signingKeys = signingCredentials instanceof Map ? signingCredentials['keys'] : null
+    def selectedProfile = signingKeys instanceof Map ? signingKeys[signingProfile] : null
+    if (!(selectedProfile instanceof Map)) {
+        throw new GradleException("Unknown PENGUIN_SIGNING_PROFILE: ${signingProfile}")
+    }
+    def selectedKeystore = new File(String.valueOf(selectedProfile.keystore))
+    if (!selectedKeystore.isAbsolute()) {
+        selectedKeystore = new File(signingCredentialsFile.parentFile, String.valueOf(selectedProfile.keystore))
+    }
+    keystoreProperties['storeFile'] = selectedKeystore.absolutePath
+    keystoreProperties['storePassword'] = selectedProfile.storePassword
+    keystoreProperties['keyAlias'] = selectedProfile.alias
+    keystoreProperties['keyPassword'] = selectedProfile.keyPassword
+} else if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def hasReleaseSigning = hasExternalSigning || keystorePropertiesFile.exists()
+if (hasReleaseSigning) {
     ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].each { key ->
         if (!keystoreProperties[key]) {
-            throw new GradleException("Missing ${key} in android/keystore.properties")
+            throw new GradleException("Missing release signing value: ${key}")
         }
     }
 }
@@ -17,7 +48,7 @@ gradle.taskGraph.whenReady { graph ->
         task.project == project && task.name.toLowerCase().contains('release')
     }
     if (releaseRequested && !hasReleaseSigning) {
-        throw new GradleException('android/keystore.properties is required for every release build')
+        throw new GradleException('Release signing credentials are required for every release build')
     }
 }
 

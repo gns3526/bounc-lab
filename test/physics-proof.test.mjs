@@ -35,6 +35,7 @@ test('deterministic verifier accepts the exact successful input replay', () => {
 
 test('deterministic verifier rejects incomplete, post-clear, and malformed replays', () => {
   const map = replayMap();
+  assert.equal(MAX_REPLAY_TICKS, 7_200);
   assert.equal(verifyCompletionReplay(map, replay(343)).code, 'REPLAY_DID_NOT_CLEAR');
   assert.equal(verifyCompletionReplay(map, replay(345)).code, 'REPLAY_AFTER_CLEAR');
   assert.equal(verifyCompletionReplay(map, replay(500, [[0, 0]])).code, 'REPLAY_DID_NOT_CLEAR');

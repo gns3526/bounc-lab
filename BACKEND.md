@@ -41,7 +41,7 @@ ONEstore·Google Play용 Capacitor 앱은 `https://localhost` Origin을 사용�
 
 게시 티켓은 클리어한 맵 해시와 작성자에 묶이며 20분 동안 유효하고 한 번만 사용할 수 있습니다. 게시된 맵 본문은 수정 API가 없어 불변입니다.
 
-클리어 요청의 `replay`는 `{ "version": 1, "engineVersion": "bounce-physics-v1", "totalTicks": 344, "events": [[0, 1]] }` 형식입니다. `events`는 120Hz 물리 틱 기준 `[tick, direction]` 변화만 담으며 방향은 `-1`, `0`, `1`입니다. 서버가 동일한 물리 엔진으로 전체 플레이를 다시 실행해 마지막 틱에 실제 출구에 도달한 경우에만 티켓을 발급합니다. 최대 길이는 5분(36,000틱), 최대 입력 이벤트는 4,096개입니다.
+클리어 요청의 `replay`는 `{ "version": 1, "engineVersion": "bounce-physics-v1", "totalTicks": 344, "events": [[0, 1]] }` 형식입니다. `events`는 120Hz 물리 틱 기준 `[tick, direction]` 변화만 담으며 방향은 `-1`, `0`, `1`입니다. 서버가 동일한 물리 엔진으로 전체 플레이를 다시 실행해 마지막 틱에 실제 출구에 도달한 경우에만 티켓을 발급합니다. Cloudflare Workers 무료 CPU 한도에 맞춘 최대 길이는 1분(7,200틱), 최대 입력 이벤트는 4,096개입니다.
 
 ## API
 

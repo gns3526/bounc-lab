@@ -23,7 +23,7 @@ application ID는 **어느 스토어에도 최초 등록·업로드하기 전까
 
 ## 웹 번들 및 동기화
 
-`.env.android`를 만들거나 현재 셸에 운영 API 주소를 설정합니다.
+`.env.android`를 만들고 운영 API 주소와 이용자가 열 수 있는 공개 앱 주소를 설정합니다. Cloudflare Workers에서 정적 파일과 API를 함께 제공하면 두 값에 같은 `https://...workers.dev` 주소를 사용할 수 있습니다.
 
 ```powershell
 Copy-Item .env.android.example .env.android
@@ -32,13 +32,21 @@ npm run sync:android
 npm run open:android
 ```
 
-`build:android:web`은 `VITE_API_BASE_URL`이 공개 `https://` 주소가 아니면 중단됩니다. Android WebView의 Origin은 `https://localhost`로 고정했으므로 운영 API 서버의 `ALLOWED_ORIGINS`에도 이 값을 추가해야 온라인 맵 요청의 CORS 사전 검사가 통과합니다.
+`build:android:web`은 `VITE_API_BASE_URL`과 `VITE_PUBLIC_APP_URL`이 모두 실제 공개 `https://` 주소가 아니면 중단됩니다. `VITE_PUBLIC_APP_URL`은 공유한 맵 링크가 Android WebView 내부 주소인 `https://localhost`를 가리키지 않게 합니다. Android WebView의 Origin은 `https://localhost`로 고정했으므로 운영 API 서버의 `ALLOWED_ORIGINS`에도 이 값을 추가해야 온라인 맵 요청의 CORS 사전 검사가 통과합니다.
 
 ## Release 출력
 
-`android/keystore.properties.example`을 `android/keystore.properties`로 복사한 뒤 현재 제출 대상 스토어의 업로드키 경로와 암호를 입력합니다. 실제 설정 파일은 Git에서 제외됩니다. 앱 서명키 자체로 배포 파일을 반복 서명하지 말고 스토어별 업로드키를 사용합니다.
+`android/keystore.properties.example`을 `android/keystore.properties`로 복사한 뒤 현재 제출 대상 스토어의 업로드키 경로와 암호를 입력할 수 있습니다. 실제 설정 파일은 Git에서 제외됩니다. 보안 폴더의 `credentials.json`을 직접 읽는 방식은 비밀번호를 프로젝트에 복사하지 않으므로 Google Play와 ONEstore 산출물을 연속해서 만들 때 권장합니다.
 
-`bundleRelease`와 `assembleRelease`는 `android/keystore.properties`가 없으면 즉시 실패하도록 설정되어 있습니다. 서명되지 않은 release 파일은 생성하거나 업로드하지 않습니다.
+```powershell
+$env:PENGUIN_SIGNING_CREDENTIALS_FILE='보안 폴더의 credentials.json 절대 경로'
+$env:PENGUIN_SIGNING_PROFILE='googleUpload' # 또는 oneStoreUpload
+npm run build:android:aab
+```
+
+앱 서명키 자체로 배포 파일을 반복 서명하지 말고 스토어별 업로드키를 사용합니다.
+
+`bundleRelease`와 `assembleRelease`는 `android/keystore.properties` 또는 위 보안 자격증명 환경 설정이 없으면 즉시 실패하도록 구성합니다. 서명되지 않은 release 파일은 생성하거나 업로드하지 않습니다.
 
 Capacitor 8.5.0이 생성한 프로젝트는 `compileSdkVersion = 36`, `targetSdkVersion = 36`을 사용합니다. 2026년 8월 말 정책 경계 이후에도 제출할 수 있도록 API 36에서 낮추지 않습니다. Activity의 방향은 `unspecified`로 두어 세로와 가로 회전을 모두 허용합니다.
 

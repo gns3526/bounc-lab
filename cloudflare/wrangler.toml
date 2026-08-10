@@ -1,0 +1,44 @@
+name = "penguin-bounce"
+main = "worker.mjs"
+compatibility_date = "2026-08-08"
+workers_dev = true
+preview_urls = false
+
+[vars]
+ENVIRONMENT = "production"
+TOSS_APP_NAME = "penguin-bounce"
+ALLOWED_ORIGINS = "https://penguin-bounce.web.tossmini.com,https://penguin-bounce.private-web.tossmini.com,https://localhost"
+
+[secrets]
+required = ["PUBLISH_SECRET", "MODERATION_TOKEN"]
+
+[[ratelimits]]
+name = "GENERAL_RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 240
+  period = 60
+
+[[ratelimits]]
+name = "WRITE_RATE_LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 60
+  period = 60
+
+[[d1_databases]]
+binding = "DB"
+database_name = "penguin-bounce-prod"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+[assets]
+directory = "../public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[triggers]
+crons = ["17 3 * * *"]

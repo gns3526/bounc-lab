@@ -1,0 +1,5 @@
+# Copy this file to cloudflare/.dev.vars for local Wrangler development only.
+# Never commit the copied file or real values.
+PUBLISH_SECRET=replace-with-a-random-secret-of-at-least-32-characters
+MODERATION_TOKEN=replace-with-a-different-random-secret-of-at-least-32-characters
+ENVIRONMENT=development
