@@ -14,7 +14,7 @@ required = ["PUBLISH_SECRET", "MODERATION_TOKEN"]
 
 [[ratelimits]]
 name = "GENERAL_RATE_LIMITER"
-namespace_id = "1001"
+namespace_id = "826108101"
 
   [ratelimits.simple]
   limit = 240
@@ -22,7 +22,7 @@ namespace_id = "1001"
 
 [[ratelimits]]
 name = "WRITE_RATE_LIMITER"
-namespace_id = "1002"
+namespace_id = "826108102"
 
   [ratelimits.simple]
   limit = 60

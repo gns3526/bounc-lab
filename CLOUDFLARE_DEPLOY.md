@@ -88,7 +88,7 @@ Invoke-RestMethod https://penguin-bounce.<계정>.workers.dev/api/health
 
 리플레이 검증은 서버가 물리 시뮬레이션을 다시 실행합니다. Free 플랜의 호출당 CPU 제한에 D1·암호화 여유를 남기기 위해 공용 물리 엔진과 Worker 게시 검증을 최대 1분(7,200틱)으로 통일했습니다. 1분을 넘기면 게임 화면에서 맵을 줄이거나 지름길을 만든 뒤 다시 검증하도록 안내합니다. 실제 트래픽에서 Worker CPU 시간과 D1 행 사용량을 모니터링하고, 더 긴 게시 리플레이가 꼭 필요하면 유료 Workers 또는 별도 검증 큐를 고려해야 합니다.
 
-일반 조회와 쓰기 요청은 Cloudflare Workers Rate Limiting 바인딩의 1분 카운터를 사용하므로 매 요청마다 D1 쓰기가 발생하지 않습니다. 이 카운터는 Cloudflare 위치별로 동작하며 비동기적으로 일관성이 맞춰지는 악용 방지용 제한입니다. 신고는 한 시간 동안 IP 해시와 익명 신고자별 횟수를 정확히 제한해야 하므로 D1에만 제한 상태를 저장합니다. `namespace_id` 1001·1002는 같은 Cloudflare 계정의 다른 Rate Limiting 바인딩과 겹치지 않는 고유한 양의 정수로 유지하세요.
+일반 조회와 쓰기 요청은 Cloudflare Workers Rate Limiting 바인딩의 1분 카운터를 사용하므로 매 요청마다 D1 쓰기가 발생하지 않습니다. 이 카운터는 Cloudflare 위치별로 동작하며 비동기적으로 일관성이 맞춰지는 악용 방지용 제한입니다. 신고는 한 시간 동안 IP 해시와 익명 신고자별 횟수를 정확히 제한해야 하므로 D1에만 제한 상태를 저장합니다. 두 `namespace_id`는 이 앱을 위해 구분한 값이며, 같은 Cloudflare 계정의 다른 Rate Limiting 바인딩에서 재사용하지 마세요.
 
 공식 문서:
 
