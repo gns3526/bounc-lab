@@ -1,5 +1,14 @@
 # Cloudflare Workers + D1 배포
 
+## 현재 프로덕션 배포
+
+- 공개 주소: `https://penguin-bounce.overwatchkr.workers.dev`
+- 상태 확인: `https://penguin-bounce.overwatchkr.workers.dev/api/health`
+- D1 데이터베이스: `penguin-bounce-prod` (APAC)
+- 배포일: 2026-08-11
+
+Google Play 및 Android 프로덕션 빌드도 위 주소를 사용합니다. 운영 비밀값은 Cloudflare Secrets에만 저장하며 Git에는 커밋하지 않습니다.
+
 이 구성은 기존 `server.mjs`의 온라인 맵 API를 Cloudflare Workers와 D1에서 실행합니다. 작은 서비스는 Workers/D1 무료 할당량 안에서 운영할 수 있고, 서버 프로세스나 디스크 볼륨을 직접 관리하지 않아도 됩니다. `public/`도 Workers Static Assets로 함께 배포됩니다.
 
 ## 유지되는 API 계약

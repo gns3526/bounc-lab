@@ -31,7 +31,7 @@ namespace_id = "826108102"
 [[d1_databases]]
 binding = "DB"
 database_name = "penguin-bounce-prod"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "c82fb773-a064-46e9-9b0b-6c81ff99b47d"
 migrations_dir = "migrations"
 
 [assets]
