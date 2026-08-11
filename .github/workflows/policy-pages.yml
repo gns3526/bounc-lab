@@ -1,0 +1,53 @@
+name: Deploy policy pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - public/privacy.html
+      - public/terms.html
+      - public/community-guidelines.html
+      - public/data-deletion.html
+      - .github/workflows/policy-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build policy-only site
+        shell: bash
+        run: |
+          mkdir -p .policy-pages
+          cp public/privacy.html .policy-pages/privacy.html
+          cp public/terms.html .policy-pages/terms.html
+          cp public/community-guidelines.html .policy-pages/community-guidelines.html
+          cp public/data-deletion.html .policy-pages/data-deletion.html
+          cp public/privacy.html .policy-pages/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .policy-pages
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
