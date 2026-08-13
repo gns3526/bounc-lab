@@ -16,6 +16,9 @@ const explicitAppName = env.TOSS_APP_NAME?.trim();
 const appName = explicitAppName || confirmedAppName;
 const apiBaseUrl = env.VITE_API_BASE_URL?.trim() || '';
 const publicAppUrl = env.VITE_PUBLIC_APP_URL?.trim() || '';
+const rawInterstitialAdGroupId = env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID;
+const interstitialAdGroupId =
+  rawInterstitialAdGroupId?.trim() || (isDevelopment ? 'ait-ad-test-interstitial-id' : '');
 
 function requireExactVersion(actual, expected, label) {
   if (actual !== expected) {
@@ -104,6 +107,28 @@ if (publicAppUrl) {
   warnings.push(
     'VITE_PUBLIC_APP_URL is empty; Toss intoss sharing still works, but non-Toss browser fallback links use the current page.',
   );
+}
+
+if (!isDevelopment) {
+  if (!interstitialAdGroupId) {
+    errors.push('VITE_TOSS_INTERSTITIAL_AD_GROUP_ID is required for a production Toss build.');
+  } else {
+    if (rawInterstitialAdGroupId !== interstitialAdGroupId || /\s/.test(interstitialAdGroupId)) {
+      errors.push('VITE_TOSS_INTERSTITIAL_AD_GROUP_ID must not contain whitespace.');
+    }
+    if (/^ait-ad-test-/i.test(interstitialAdGroupId)) {
+      errors.push(
+        'VITE_TOSS_INTERSTITIAL_AD_GROUP_ID must use a production ad group ID, not an Apps in Toss test ID.',
+      );
+    }
+    if (
+      /(?:placeholder|replace[-_ ]?with|change[-_ ]?me|your[-_ ]|example|<|>)/i.test(
+        interstitialAdGroupId,
+      )
+    ) {
+      errors.push('VITE_TOSS_INTERSTITIAL_AD_GROUP_ID must not be a placeholder value.');
+    }
+  }
 }
 
 for (const warning of warnings) console.warn(`Toss release warning: ${warning}`);

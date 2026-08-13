@@ -15,6 +15,7 @@
 - 앱인토스 WebView SDK 3.x 의존성과 Vite 기반 토스 빌드 스캐폴드가 포함되어 있습니다.
 - 앱인토스 콘솔의 변경 불가능한 `appName`은 `penguin-bounce`로 확정되어 빌드 기본값에 반영되어 있습니다. 운영 빌드에서 `TOSS_APP_NAME`을 명시한다면 반드시 이 값과 같아야 합니다.
 - 토스 빌드에서는 `VITE_API_BASE_URL`을 클라이언트에 주입하며, 운영 빌드는 절대 `https://` API 주소만 허용하도록 구성합니다. `VITE_PUBLIC_APP_URL`을 설정하면 토스 밖의 브라우저 공유 대체 경로에서 공개 웹 주소를 사용합니다. 토스 안의 공유는 계속 `intoss://penguin-bounce` 링크를 우선 사용합니다.
+- 토스 빌드는 `VITE_TOSS_INTERSTITIAL_AD_GROUP_ID`를 `toss-interstitial-ad-group-id` 메타 태그로 주입합니다. 운영 빌드는 앱인토스 콘솔에서 발급한 운영용 전면 광고 그룹 ID가 반드시 필요하며, 테스트 ID와 예시값은 출시 검증 단계에서 거부됩니다.
 - 기존 100개 스테이지, 모바일 조작, 반응형 화면, 맵 에디터, 온라인 맵 탐색·검색·공유 흐름이 구현되어 있습니다.
 - 제작자가 직접 클리어한 맵만 게시할 수 있도록 서버가 120Hz 결정론적 물리 리플레이를 다시 검증합니다.
 - 게시 티켓은 작성자와 맵 내용에 묶이고 한 번만 사용할 수 있습니다. 입력 크기 제한, 맵 스키마 검증, 요청 속도 제한과 기본 보안 헤더도 적용되어 있습니다.
@@ -62,6 +63,17 @@ https://<appName>.private-web.tossmini.com
 - 맵 신고·삭제 요청, 데이터 삭제 요청, 장애 문의에 대응할 수 있어야 합니다.
 - 이용약관과 개인정보처리방침에도 같은 연락처를 표시합니다.
 
+### 2-4. 운영용 전면 광고 그룹 ID — 필수
+
+토스 미니앱 배포판에서만 Apps in Toss 통합 광고를 사용합니다. 앱인토스 콘솔에서 펭귄 바운스용 **운영 전면 광고 그룹**을 만들고 발급된 ID를 빌드 환경의 `VITE_TOSS_INTERSTITIAL_AD_GROUP_ID`에 설정합니다.
+
+- `npm run build:toss`는 ID 누락·공백, `ait-ad-test-interstitial-id` 같은 테스트 ID, `replace-with...` 같은 예시값을 거부합니다.
+- `npm run build:toss:dev`는 변수를 비워 두면 `ait-ad-test-interstitial-id`를 자동 사용합니다. 개발·QR 확인용 테스트 ID를 운영 번들에 넣지 않습니다.
+- Vite가 토스 HTML에 `<meta name="toss-interstitial-ad-group-id" ...>`를 자동 주입하므로 HTML을 수동 수정하지 않습니다.
+- 광고 그룹 ID는 공개 클라이언트 설정값입니다. 광고 콘솔 계정 비밀번호·정산정보·서버 비밀값은 `.env`나 Git에 넣지 않습니다.
+- 개인정보처리방침과 앱인토스 콘솔의 광고 관련 고지는 토스 미니앱에서 Apps in Toss 통합 광고(Toss Ads/Google AdMob)를 사용한다는 실제 동작과 일치시킵니다.
+- Google Play·ONEstore용 Android 앱과 일반 웹 배포판에는 광고 SDK가 없으므로 Android 스토어의 광고 여부를 토스 미니앱과 혼동하지 않습니다.
+
 ## 3. 콘솔 제출 자료
 
 ### 3-1. 600×600 앱 로고 — 필수
@@ -91,6 +103,15 @@ https://<appName>.private-web.tossmini.com
 2. 게임물관리위원회에서 발급받은 등급분류증명서 PDF
 
 스토어 경로를 쓰면 스토어판과 앱인토스판의 원본 플레이 화면을 각각 2장 제출하고, 등록자명·등급분류번호·이용등급·내용정보 등이 공식 조회 결과와 일치해야 합니다. 아직 증빙이 없다면 코드 완성 여부와 관계없이 출시 검토를 끝낼 수 없습니다.
+
+현재 Google Play 출시판은 게임물관리위원회 자체등급분류 조회에서 다음과 같이 확인되었습니다.
+
+- 스토어 링크: `https://play.google.com/store/apps/details?id=com.jellysnow.penguinbounce`
+- 등급분류번호: `GOOG-SG-260811-0324`
+- 등급분류일자: 2026-08-11
+- 이용등급: 전체 이용가
+- 내용정보: 폭력성
+- 자체등급분류사업자명: 구글
 
 ## 4. 백엔드 운영 제약
 
@@ -129,6 +150,7 @@ https://<appName>.private-web.tossmini.com
 - 게시한 맵 검색·불러오기·플레이·공유 링크가 정상 작동함
 - 운영 API CORS, 오류 안내, 느린 네트워크와 연결 복구가 정상 작동함
 - 서버 재시작 뒤 게시 맵이 유지되는지 확인함
+- 테스트 광고가 게임 플레이를 방해하지 않는 시점에만 열리고, 표시·닫기·표시 실패 뒤에도 게임 진행과 사운드가 정상 복구되는지 확인함
 
 샌드박스에서 지원되지 않거나 실제 환경과 다른 기능이 있으므로 최종 판단은 반드시 콘솔 QR과 최신 토스 앱에서 합니다.
 
@@ -139,7 +161,7 @@ https://<appName>.private-web.tossmini.com
 3. 600×600 로고와 1932×828 썸네일을 제작합니다.
 4. 게임 등급분류 증빙을 확보합니다.
 5. 영속 볼륨을 연결한 단일 replica API를 HTTPS로 배포하고 백업을 설정합니다.
-6. [.env.toss.example](./.env.toss.example)을 참고해 서버와 빌드 환경의 실제 값을 설정한 뒤 토스용 `.ait`를 빌드합니다.
+6. 앱인토스 콘솔에서 운영용 전면 광고 그룹 ID를 발급하고, [.env.toss.example](./.env.toss.example)을 참고해 서버와 빌드 환경의 실제 값을 설정한 뒤 토스용 `.ait`를 빌드합니다.
 7. 콘솔에 앱 정보와 번들을 올리고 QR 실기기 테스트를 완료합니다.
 8. [게임 출시 가이드](https://developers-apps-in-toss.toss.im/checklist/app-game.html)를 마지막으로 다시 확인한 뒤 검토를 요청합니다.
 
@@ -148,6 +170,8 @@ https://<appName>.private-web.tossmini.com
 - [ ] 최종 한글 앱 이름: `________________`
 - [ ] 최종 `appName`: `penguin-bounce`
 - [ ] 운영 API URL: `https://________________`
+- [ ] 운영 전면 광고 그룹 ID 발급 및 `VITE_TOSS_INTERSTITIAL_AD_GROUP_ID` 설정
+- [ ] 운영 번들에 테스트 광고 ID·예시값이 없는지 검증 완료
 - [ ] 고객문의 이메일: `________________`
 - [ ] 600×600 로고 완료
 - [ ] 1932×828 썸네일 완료
@@ -156,4 +180,6 @@ https://<appName>.private-web.tossmini.com
 - [ ] 영속 볼륨·백업·단일 replica 확인
 - [ ] iOS 토스 QR 테스트 완료
 - [ ] Android 토스 QR 테스트 완료
+- [ ] 전면 광고 표시·닫기·실패 후 게임 복귀 테스트 완료
+- [ ] 개인정보처리방침 v1.3 공개 및 콘솔 광고 고지 일치 확인
 - [ ] 콘솔 검토 요청 전 최종 체크리스트 완료

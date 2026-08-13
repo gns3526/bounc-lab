@@ -156,6 +156,70 @@ test('Apps in Toss hooks cover identity, sharing, safe layout, and confirmed exi
   assert.doesNotMatch(tossBridge, /'bounc-lab'/);
 });
 
+test('Toss interstitials fail open and only interrupt eligible official clear transitions', () => {
+  assert.match(tossBridge, /meta\[name="toss-interstitial-ad-group-id"\]/);
+  assert.match(tossBridge, /loadFullScreenAd/);
+  assert.match(tossBridge, /showFullScreenAd/);
+  assert.match(tossBridge, /INTERSTITIAL_TIMEOUT_MS = 90_000/);
+  assert.match(tossBridge, /Ads: Object\.freeze\(\{ preloadInterstitial, showInterstitial \}\)/);
+  assert.match(tossBridge, /if \(!interstitialLoaded\) \{[\s\S]*?return Promise\.resolve\(false\)/);
+  assert.match(tossBridge, /options: \{ adGroupId: interstitialAdGroupId \}/);
+  assert.match(tossBridge, /event\?\.type === 'loaded'/);
+  assert.match(tossBridge, /type === 'dismissed'/);
+  assert.match(tossBridge, /type === 'failedToShow'/);
+  assert.match(tossBridge, /pageWasHidden && shown/);
+  assert.match(tossBridge, /outcome: 'returned'/);
+  assert.match(tossBridge, /removeEventListener\('visibilitychange', handleVisibilityChange\)/);
+  assert.match(tossBridge, /bridgeDisposed = true/);
+  assert.match(tossBridge, /activeInterstitialCancels\.delete\(cancel\)/);
+  assert.match(tossBridge, /interstitialShowPromise = null;\s*void preloadInterstitial\(\)/);
+
+  const isCandidate = frontendFunction(
+    'isOfficialInterstitialCandidate',
+    'shouldShowOfficialInterstitial',
+  );
+  assert.equal(isCandidate(5, 120_000, Infinity), true);
+  assert.equal(isCandidate(10, 121_000, 180_000), true);
+  assert.equal(isCandidate(4, 999_999, Infinity), false);
+  assert.equal(isCandidate(5, 119_999, Infinity), false);
+  assert.equal(isCandidate(5, 999_999, 179_999), false);
+
+  assert.match(
+    html,
+    /return !customMode&&playContext==='official'&&isOfficialInterstitialCandidate/,
+  );
+  assert.match(html, /if\(!customMode&&playContext==='official'\)officialClearCount\+\+/);
+  assert.match(
+    html,
+    /if\(shouldShowOfficialInterstitial\(\)\)await showOfficialInterstitialBeforeNextStage\(\)/,
+  );
+  assert.match(html, /if\(clearAdvancePending\)return;\s*clearAdvancePending=true/);
+  assert.match(html, /state='ad';paused=true/);
+  assert.match(html, /releasePointerControl\(\);SFX\.stopContinuous\(\);BGM\.pause\(\)/);
+  assert.match(html, /if\(result&&result\.shown===true\)lastInterstitialShownAt=performance\.now\(\)/);
+  assert.match(html, /if\(!muted&&!document\.hidden\)BGM\.resume\(\)/);
+  assert.match(html, /if\(adTransitionActive\)return;if\(state==='playing'&&!paused\)togglePause/);
+
+  for (const [startName, endName] of [
+    ['restartStage', 'die'],
+    ['die', 'completeStage'],
+    ['loadCustomStage', 'startCustomGame'],
+  ]) {
+    const start = html.indexOf(`  function ${startName}(`);
+    const end = [
+      html.indexOf(`\n\n  function ${endName}(`, start),
+      html.indexOf(`\n\n  async function ${endName}(`, start),
+    ].filter((index) => index >= 0).sort((a, b) => a - b)[0] ?? -1;
+    assert.notEqual(start, -1);
+    assert.notEqual(end, -1);
+    assert.doesNotMatch(
+      html.slice(start, end),
+      /showInterstitial|showOfficialInterstitial/,
+      `${startName} must never display an ad`,
+    );
+  }
+});
+
 test('two bundled BGM tracks form a gesture-unlocked background playlist', async () => {
   assert.match(html, /id="bgmAudio" preload="metadata" playsinline/);
   assert.match(html, /data-bgm-track src="\.\/assets\/audio\/penguin-bounce-01\.mp3"/);

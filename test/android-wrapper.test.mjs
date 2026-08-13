@@ -112,7 +112,47 @@ test('Toss validation checks a configured browser fallback URL while preserving 
     VITE_API_BASE_URL: 'https://penguin-bounce-release.workers.dev',
     VITE_PUBLIC_APP_URL: '',
     TOSS_APP_NAME: 'penguin-bounce',
+    VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: 'penguin-bounce-interstitial-production',
   };
+
+  const missingAdGroup = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: '' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(missingAdGroup.status, 0);
+  assert.match(missingAdGroup.stderr, /VITE_TOSS_INTERSTITIAL_AD_GROUP_ID is required/);
+
+  const whitespaceAdGroup = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: ' production-ad ' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(whitespaceAdGroup.status, 0);
+  assert.match(whitespaceAdGroup.stderr, /must not contain whitespace/);
+
+  const testAdGroup = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: 'ait-ad-test-interstitial-id' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(testAdGroup.status, 0);
+  assert.match(testAdGroup.stderr, /not an Apps in Toss test ID/);
+
+  const placeholderAdGroup = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: 'replace-with-production-id' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(placeholderAdGroup.status, 0);
+  assert.match(placeholderAdGroup.stderr, /must not be a placeholder/);
+
+  const developmentDefault = spawnSync(process.execPath, [script, '--development'], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: '' },
+    encoding: 'utf8',
+  });
+  assert.equal(developmentDefault.status, 0, developmentDefault.stderr);
 
   const localShareUrl = spawnSync(process.execPath, [script], {
     cwd: projectRoot,
@@ -132,6 +172,11 @@ test('Toss validation checks a configured browser fallback URL while preserving 
   const tossBridge = await readText('public/toss-bridge.js');
   assert.match(tossBridge, /intoss:\/\//);
   assert.match(tossBridge, /Share\.createLink/);
+
+  const viteConfig = await readText('vite.config.mjs');
+  assert.match(viteConfig, /VITE_TOSS_INTERSTITIAL_AD_GROUP_ID/);
+  assert.match(viteConfig, /toss-interstitial-ad-group-id/);
+  assert.match(viteConfig, /ait-ad-test-interstitial-id/);
 });
 
 test('Android secrets stay ignored and privacy policy reflects actual online data flow', async () => {
@@ -157,6 +202,11 @@ test('Android secrets stay ignored and privacy policy reflects actual online dat
   assert.match(privacy, /대한민국 외 지역/);
   assert.match(privacy, /Time Travel 복구 지점에는 삭제·수정 전 데이터가 최대 7일간/);
   assert.match(privacy, /IP 주소 원문 대신 SHA-256/);
+  assert.match(privacy, /Apps in Toss 통합 광고/);
+  assert.match(privacy, /Google AdMob/);
+  assert.match(privacy, /광고 요청·노출·클릭 정보/);
+  assert.match(privacy, /Google Play·ONEstore용 Android 앱과 일반 웹 배포판에는[^<]+광고 SDK가 포함되지 않으며/);
+  assert.match(privacy, /시행일: 2026년 8월 13일 · 문서 버전 1\.3/);
   assert.match(privacy, /hoon@jellysnow\.com/);
   assert.match(releaseGuide, /최초 등록·업로드하기 전까지만/);
   assert.match(releaseGuide, /ALLOWED_ORIGINS/);

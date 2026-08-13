@@ -3,14 +3,28 @@ const isTossMiniapp = root.classList.contains('toss-miniapp');
 const appName =
   document.querySelector('meta[name="toss-app-name"]')?.getAttribute('content')?.trim() ||
   'penguin-bounce';
+const rawInterstitialAdGroupId =
+  document
+    .querySelector('meta[name="toss-interstitial-ad-group-id"]')
+    ?.getAttribute('content')
+    ?.trim() || '';
+const interstitialAdGroupId = /^%VITE_[A-Z0-9_]+%$/.test(rawInterstitialAdGroupId)
+  ? ''
+  : rawInterstitialAdGroupId;
 
 const SAFE_AREA_EVENT = 'bounc:toss-safe-area';
 const BACK_EVENT = 'bounc:toss-back';
 const READY_EVENT = 'bounc:toss-ready';
 const ERROR_EVENT = 'bounc:toss-error';
+const INTERSTITIAL_TIMEOUT_MS = 90_000;
 
 let safeArea = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });
 let identity = Object.freeze({ userHash: '', profileName: '' });
+let interstitialLoaded = false;
+let interstitialLoadPromise = null;
+let interstitialShowPromise = null;
+let bridgeDisposed = false;
+const activeInterstitialCancels = new Set();
 
 function normalizeInset(value) {
   const number = Number(value);
@@ -44,7 +58,16 @@ function subscribeWindowEvent(eventName, listener) {
 async function initializeTossSdk() {
   // Keep this import inside the Toss-only branch. Opening toss-bridge.js from the
   // raw localhost server must never try to resolve or initialize the native SDK.
-  const { Game, SafeArea, Screen, Share, User, graniteEvent } = await import(
+  const {
+    Game,
+    SafeArea,
+    Screen,
+    Share,
+    User,
+    graniteEvent,
+    loadFullScreenAd,
+    showFullScreenAd,
+  } = await import(
     '@apps-in-toss/web-framework'
   );
 
@@ -95,10 +118,20 @@ async function initializeTossSdk() {
         : '',
   });
 
-  const sdk = { Game, Screen, Share, User, identity };
+  const sdk = {
+    Game,
+    Screen,
+    Share,
+    User,
+    identity,
+    loadFullScreenAd,
+    showFullScreenAd,
+  };
   window.addEventListener(
     'pagehide',
     () => {
+      bridgeDisposed = true;
+      for (const cancel of [...activeInterstitialCancels]) cancel();
       for (const cleanup of cleanups.splice(0)) cleanup?.();
     },
     { once: true },
@@ -159,6 +192,144 @@ async function shareMap(mapId, title = 'BOUNC LAB 맵', text = '') {
   return link;
 }
 
+function isSupported(method) {
+  if (typeof method !== 'function') return false;
+  try {
+    return typeof method.isSupported !== 'function' || method.isSupported();
+  } catch (_) {
+    return false;
+  }
+}
+
+function preloadInterstitial() {
+  if (bridgeDisposed || !isTossMiniapp || !interstitialAdGroupId || interstitialShowPromise) {
+    return Promise.resolve(false);
+  }
+  if (interstitialLoaded) return Promise.resolve(true);
+  if (interstitialLoadPromise) return interstitialLoadPromise;
+
+  interstitialLoadPromise = requireSdk()
+    .then(({ loadFullScreenAd }) => {
+      if (!isSupported(loadFullScreenAd)) return false;
+
+      return new Promise((resolve) => {
+        let cleanup;
+        let finished = false;
+        let timeoutId;
+        const finish = (loaded) => {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timeoutId);
+          activeInterstitialCancels.delete(cancel);
+          try {
+            cleanup?.();
+          } catch (_) {}
+          interstitialLoaded = loaded;
+          resolve(loaded);
+        };
+        const cancel = () => finish(false);
+        activeInterstitialCancels.add(cancel);
+        timeoutId = setTimeout(cancel, INTERSTITIAL_TIMEOUT_MS);
+
+        try {
+          cleanup = loadFullScreenAd({
+            options: { adGroupId: interstitialAdGroupId },
+            onEvent: (event) => {
+              if (event?.type === 'loaded') finish(true);
+            },
+            onError: cancel,
+          });
+          if (finished) cleanup?.();
+        } catch (_) {
+          cancel();
+        }
+      });
+    })
+    .catch(() => false)
+    .finally(() => {
+      interstitialLoadPromise = null;
+    });
+
+  return interstitialLoadPromise;
+}
+
+function showInterstitial() {
+  if (bridgeDisposed || !isTossMiniapp || !interstitialAdGroupId) return Promise.resolve(false);
+  if (interstitialShowPromise) return interstitialShowPromise;
+  if (!interstitialLoaded) {
+    void preloadInterstitial();
+    return Promise.resolve(false);
+  }
+
+  interstitialLoaded = false;
+  interstitialShowPromise = requireSdk()
+    .then(({ showFullScreenAd }) => {
+      if (!isSupported(showFullScreenAd)) return false;
+
+      return new Promise((resolve) => {
+        let cleanup;
+        let finished = false;
+        let shown = false;
+        let pageWasHidden = false;
+        let timeoutId;
+        const finish = (result) => {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timeoutId);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          activeInterstitialCancels.delete(cancel);
+          try {
+            cleanup?.();
+          } catch (_) {}
+          resolve(result);
+        };
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            pageWasHidden = true;
+            return;
+          }
+          // Some older Toss Android versions do not emit `dismissed`. Returning
+          // from a native ad after an actual show/impression is an equivalent
+          // terminal signal, so the game must be allowed to continue.
+          if (pageWasHidden && shown) {
+            finish(Object.freeze({ shown: true, outcome: 'returned' }));
+          }
+        };
+        const cancel = () =>
+          finish(shown ? Object.freeze({ shown: true, outcome: 'timeout' }) : false);
+        activeInterstitialCancels.add(cancel);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        timeoutId = setTimeout(cancel, INTERSTITIAL_TIMEOUT_MS);
+
+        try {
+          cleanup = showFullScreenAd({
+            options: { adGroupId: interstitialAdGroupId },
+            onEvent: (event) => {
+              const type = event?.type;
+              if (type === 'show' || type === 'impression' || type === 'clicked') shown = true;
+              if (type === 'dismissed') {
+                finish(Object.freeze({ shown: true, outcome: 'dismissed' }));
+              } else if (type === 'failedToShow') {
+                finish(false);
+              }
+            },
+            onError: () => finish(false),
+          });
+          if (finished) cleanup?.();
+        } catch (_) {
+          finish(false);
+        }
+      });
+    })
+    .catch(() => false)
+    .finally(() => {
+      interstitialShowPromise = null;
+      void preloadInterstitial();
+    });
+
+  return interstitialShowPromise;
+}
+
 const bridge = Object.freeze({
   isTossMiniapp,
   appName,
@@ -168,6 +339,7 @@ const bridge = Object.freeze({
   },
   User: Object.freeze({ getAnonymousKey }),
   Game: Object.freeze({ getUserProfile }),
+  Ads: Object.freeze({ preloadInterstitial, showInterstitial }),
   SafeArea: Object.freeze({
     get: () => safeArea,
     subscribe: (listener) => subscribeWindowEvent(SAFE_AREA_EVENT, listener),

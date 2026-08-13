@@ -2449,7 +2449,10 @@
       if(ui.authorNameInput&&!ui.authorNameInput.value)ui.authorNameInput.value=profileName;
     }
   }
-  addEventListener('bounc:toss-ready',event=>applyTossIdentity(event.detail));
+  addEventListener('bounc:toss-ready',event=>{
+    applyTossIdentity(event.detail);
+    void preloadTossInterstitial();
+  });
   let state = 'menu';
   let paused = false;
   let exitReturnOverlay='startOverlay';
@@ -2463,6 +2466,11 @@
   let stageIntro = 0;
   let deathTimer = 0;
   let clearTimer = 0;
+  const interstitialSessionStartedAt = performance.now();
+  let officialClearCount = 0;
+  let lastInterstitialShownAt = -Infinity;
+  let clearAdvancePending = false;
+  let adTransitionActive = false;
   let hintActive = false;
   let hintPath = [];
   let shake = 0;
@@ -3583,6 +3591,48 @@
     return {x:48,y:64};
   }
 
+  function isOfficialInterstitialCandidate(clearCount,sessionElapsedMs,sinceLastAdMs){
+    return clearCount>0&&clearCount%5===0&&sessionElapsedMs>=120000&&sinceLastAdMs>=180000;
+  }
+
+  function shouldShowOfficialInterstitial(now=performance.now()){
+    return !customMode&&playContext==='official'&&isOfficialInterstitialCandidate(
+      officialClearCount,
+      now-interstitialSessionStartedAt,
+      now-lastInterstitialShownAt
+    );
+  }
+
+  function preloadTossInterstitial(){
+    try{return window.__BOUNC_TOSS__?.Ads?.preloadInterstitial?.()||Promise.resolve(false);}
+    catch(_){return Promise.resolve(false);}
+  }
+
+  async function showOfficialInterstitialBeforeNextStage(){
+    const show=window.__BOUNC_TOSS__?.Ads?.showInterstitial;
+    if(typeof show!=='function')return false;
+
+    adTransitionActive=true;
+    state='ad';paused=true;
+    releasePointerControl();SFX.stopContinuous();BGM.pause();
+    let lifecycleFinished=false;
+    const finishLifecycle=()=>{
+      if(lifecycleFinished)return;
+      lifecycleFinished=true;
+      adTransitionActive=false;
+    };
+
+    try{
+      const result=await show();
+      if(result&&result.shown===true)lastInterstitialShownAt=performance.now();
+      return result;
+    }catch(_){
+      return false;
+    }finally{
+      finishLifecycle();
+    }
+  }
+
   function loadStage(index, showToast=true, playStageSfx=true) {
     SFX.stopContinuous();
     customMode=false;
@@ -3592,7 +3642,7 @@
     breakTimers.clear(); particles.length=0; trail.length=0; arrowDriveActive=false;arrowDir=0;arrowStartPressSerial=directionalPressSerial;
     suppressVerticalArrowThisStep=false;arrowRearmBlockKey='';arrowRearmTimer=0;arrowSourceKey='';
     wallKickLockTimer=0;wallKickCooldown=0;wallKickPressSerial=directionalPressSerial;wallKickHintShown=false;
-    boundCount=0;stageTime=0;stageIntro=.8;deathTimer=0;clearTimer=0;shake=0;hintPath=[];
+    boundCount=0;stageTime=0;stageIntro=.8;deathTimer=0;clearTimer=0;clearAdvancePending=false;shake=0;hintPath=[];
     const spawn=findSpawn(grid,stageIndex);
     const stageMeta=STAGE_META[stageIndex]||{chapter:1,phase:1,title:'중간 단계',kind:'bridge'};
     Object.assign(player,{x:spawn.x,y:spawn.y,px:spawn.x,py:spawn.y,vx:stageIndex<5?32:0,vy:0,rot:0,squash:0,facing:1,lastWall:0,lastWallSide:0,lastWallTile:0,alive:true,clear:false,spawnX:spawn.x,spawnY:spawn.y,lastSafeX:spawn.x,lastSafeY:spawn.y});
@@ -3619,7 +3669,7 @@
     breakTimers.clear();particles.length=0;trail.length=0;arrowDriveActive=false;arrowDir=0;arrowStartPressSerial=directionalPressSerial;
     suppressVerticalArrowThisStep=false;arrowRearmBlockKey='';arrowRearmTimer=0;arrowSourceKey='';
     wallKickLockTimer=0;wallKickCooldown=0;wallKickPressSerial=directionalPressSerial;wallKickHintShown=false;
-    boundCount=0;stageTime=0;stageIntro=.65;deathTimer=0;clearTimer=0;shake=0;hintPath=[];
+    boundCount=0;stageTime=0;stageIntro=.65;deathTimer=0;clearTimer=0;clearAdvancePending=false;shake=0;hintPath=[];
     const spawn={x:(customMapData.spawn.c+.5)*TILE,y:(customMapData.spawn.r+.5)*TILE};
     Object.assign(player,{x:spawn.x,y:spawn.y,px:spawn.x,py:spawn.y,vx:0,vy:0,rot:0,squash:0,facing:1,lastWall:0,lastWallSide:0,lastWallTile:0,alive:true,clear:false,spawnX:spawn.x,spawnY:spawn.y,lastSafeX:spawn.x,lastSafeY:spawn.y});
     snapGameCamera();
@@ -3640,6 +3690,7 @@
 
   async function startGame(index=stageIndex) {
     await SFX.unlock();
+    void preloadTossInterstitial();
     playContext='official';releasePointerControl();setOverlay(null);state='playing';paused=false;deathsThisStage=0;loadStage(index,true,true);lastTime=performance.now();updateControlModeUI();
   }
 
@@ -3660,6 +3711,7 @@
   function completeStage() {
     if(player.clear||!player.alive)return;
     player.clear=true;releasePointerControl();wallKickLockTimer=0;wallKickCooldown=0;arrowDriveActive=false;arrowDir=0;clearTimer=.48;player.vx*=.35;player.vy=-180;
+    if(!customMode&&playContext==='official')officialClearCount++;
     if(!customMode){score += 1000 + Math.max(0,600-boundCount*5) + Math.max(0,500-Math.floor(stageTime*10));safeStore.set('penguinBoundScore',score);}
     if(!customMode){unlocked=Math.max(unlocked,Math.min(STAGES.length,stageIndex+2));safeStore.set('penguinBoundUnlocked100',unlocked);}
     if(customMode&&playContext==='draft-test'&&activeAttempt)verificationPromise=completeVerificationAttempt();
@@ -3676,7 +3728,9 @@
     setOverlay('clearOverlay');
   }
 
-  function advanceAfterClear(){
+  async function advanceAfterClear(){
+    if(clearAdvancePending)return;
+    clearAdvancePending=true;
     player.clear=false;
     if(customMode){
       if(playContext==='community'){
@@ -3688,7 +3742,9 @@
       return;
     }
     const next=(stageIndex+1)%STAGES.length;
+    if(shouldShowOfficialInterstitial())await showOfficialInterstitialBeforeNextStage();
     state='playing';paused=false;setOverlay(null);loadStage(next,true,true);lastTime=performance.now();updateControlModeUI();
+    if(!muted&&!document.hidden)BGM.resume();
   }
 
   function ellipseRect(cx,cy,erx,ery,rx,ry,rw,rh) {
@@ -4338,7 +4394,7 @@
   }
   addEventListener('pointerdown',unlockGameAudio,{capture:true,passive:true});
   addEventListener('keydown',unlockGameAudio,{capture:true});
-  addEventListener('pageshow',()=>{if(!muted){SFX.unlock();BGM.resume();}});
+  addEventListener('pageshow',()=>{if(!adTransitionActive&&!muted){SFX.unlock();BGM.resume();}});
   addEventListener('pagehide',()=>BGM.pause());
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden){
@@ -4346,10 +4402,11 @@
       releasePointerControl();
       SFX.stopContinuous();
       BGM.pause();
+      if(adTransitionActive)return;
       if(state==='playing'&&!paused)togglePause(true,true);
       return;
     }
-    if(!muted){SFX.unlock();BGM.resume();}
+    if(!adTransitionActive&&!muted){SFX.unlock();BGM.resume();}
   });
   addEventListener('bounc:toss-back',openExitDialog);
 
@@ -4375,8 +4432,8 @@
     if(e.code==='ArrowLeft'||e.code==='KeyA'){input.keyLeft=false;syncDirectionalInput();}
     if(e.code==='ArrowRight'||e.code==='KeyD'){input.keyRight=false;syncDirectionalInput();}
   });
-  addEventListener('blur',()=>{input.keyLeft=input.keyRight=false;releasePointerControl();BGM.pause();if(state==='playing'&&!paused)togglePause(true,true);});
-  addEventListener('focus',()=>{if(!muted)BGM.resume();});
+  addEventListener('blur',()=>{input.keyLeft=input.keyRight=false;releasePointerControl();BGM.pause();if(adTransitionActive)return;if(state==='playing'&&!paused)togglePause(true,true);});
+  addEventListener('focus',()=>{if(!adTransitionActive&&!muted)BGM.resume();});
 
   ui.mapEditorBtn.onclick=()=>{SFX.ui();openMapEditor('startOverlay','',false);};
   ui.customPlayBtn.onclick=()=>{if(customMapData||readSavedCustomMap())startCustomGame();else openMapEditor('startOverlay','먼저 맵을 만들어 저장해주세요.',false);};

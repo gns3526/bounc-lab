@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'node:path';
 
 const CONFIRMED_APP_NAME = 'penguin-bounce';
+const TOSS_TEST_INTERSTITIAL_AD_GROUP_ID = 'ait-ad-test-interstitial-id';
 
 function addHtmlClass(html, className) {
   return html.replace(/<html\b([^>]*)>/i, (tag, attributes) => {
@@ -50,6 +51,10 @@ export default defineConfig(({ mode }) => {
   const appName = (env.TOSS_APP_NAME || CONFIRMED_APP_NAME).trim();
   const apiBaseUrl = (env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
   const publicAppUrl = (env.VITE_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
+  const tossInterstitialAdGroupId = (
+    env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID ||
+    (mode === 'toss-dev' ? TOSS_TEST_INTERSTITIAL_AD_GROUP_ID : '')
+  ).trim();
   const localApiProxy = (env.LOCAL_API_PROXY_URL || 'http://127.0.0.1:8787').trim();
 
   return {
@@ -112,6 +117,14 @@ export default defineConfig(({ mode }) => {
                 {
                   tag: 'meta',
                   attrs: { name: 'toss-app-name', content: appName },
+                  injectTo: 'head-prepend',
+                },
+                {
+                  tag: 'meta',
+                  attrs: {
+                    name: 'toss-interstitial-ad-group-id',
+                    content: tossInterstitialAdGroupId,
+                  },
                   injectTo: 'head-prepend',
                 },
                 {
