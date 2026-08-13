@@ -19,6 +19,9 @@ const publicAppUrl = env.VITE_PUBLIC_APP_URL?.trim() || '';
 const rawInterstitialAdGroupId = env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID;
 const interstitialAdGroupId =
   rawInterstitialAdGroupId?.trim() || (isDevelopment ? 'ait-ad-test-interstitial-id' : '');
+const confirmedAdFreeSku = 'ait.0000062458.d0bd5054.079e0dec8a.6635518646';
+const rawAdFreeSku = env.VITE_TOSS_AD_FREE_SKU;
+const adFreeSku = rawAdFreeSku?.trim() || '';
 
 function requireExactVersion(actual, expected, label) {
   if (actual !== expected) {
@@ -129,6 +132,31 @@ if (!isDevelopment) {
       errors.push('VITE_TOSS_INTERSTITIAL_AD_GROUP_ID must not be a placeholder value.');
     }
   }
+
+  if (!adFreeSku) {
+    errors.push('VITE_TOSS_AD_FREE_SKU is required for a production Toss build.');
+  } else {
+    if (rawAdFreeSku !== adFreeSku || /\s/.test(adFreeSku)) {
+      errors.push('VITE_TOSS_AD_FREE_SKU must not contain whitespace.');
+    }
+    if (/(?:^|[._-])test(?:[._-]|$)/i.test(adFreeSku)) {
+      errors.push('VITE_TOSS_AD_FREE_SKU must use the production non-consumable SKU, not a test SKU.');
+    }
+    if (
+      /(?:placeholder|replace[-_ ]?with|change[-_ ]?me|your[-_ ]|example|<|>)/i.test(adFreeSku)
+    ) {
+      errors.push('VITE_TOSS_AD_FREE_SKU must not be a placeholder value.');
+    }
+    if (adFreeSku !== confirmedAdFreeSku) {
+      errors.push(
+        `VITE_TOSS_AD_FREE_SKU must match the confirmed Apps in Toss SKU (${confirmedAdFreeSku}); received ${adFreeSku}.`,
+      );
+    }
+  }
+} else if (!adFreeSku) {
+  warnings.push(
+    'VITE_TOSS_AD_FREE_SKU is empty; the development bundle will not offer the ad-free purchase.',
+  );
 }
 
 for (const warning of warnings) console.warn(`Toss release warning: ${warning}`);

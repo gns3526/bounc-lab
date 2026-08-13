@@ -113,6 +113,7 @@ test('Toss validation checks a configured browser fallback URL while preserving 
     VITE_PUBLIC_APP_URL: '',
     TOSS_APP_NAME: 'penguin-bounce',
     VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: 'penguin-bounce-interstitial-production',
+    VITE_TOSS_AD_FREE_SKU: 'ait.0000062458.d0bd5054.079e0dec8a.6635518646',
   };
 
   const missingAdGroup = spawnSync(process.execPath, [script], {
@@ -154,6 +155,54 @@ test('Toss validation checks a configured browser fallback URL while preserving 
   });
   assert.equal(developmentDefault.status, 0, developmentDefault.stderr);
 
+  const missingAdFreeSku = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_AD_FREE_SKU: '' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(missingAdFreeSku.status, 0);
+  assert.match(missingAdFreeSku.stderr, /VITE_TOSS_AD_FREE_SKU is required/);
+
+  const whitespaceAdFreeSku = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_AD_FREE_SKU: ' ait.0000062458.d0bd5054.079e0dec8a.6635518646 ' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(whitespaceAdFreeSku.status, 0);
+  assert.match(whitespaceAdFreeSku.stderr, /VITE_TOSS_AD_FREE_SKU must not contain whitespace/);
+
+  const testAdFreeSku = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_AD_FREE_SKU: 'ait.test.remove-ads' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(testAdFreeSku.status, 0);
+  assert.match(testAdFreeSku.stderr, /not a test SKU/);
+
+  const placeholderAdFreeSku = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_AD_FREE_SKU: 'replace-with-ad-free-sku' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(placeholderAdFreeSku.status, 0);
+  assert.match(placeholderAdFreeSku.stderr, /VITE_TOSS_AD_FREE_SKU must not be a placeholder/);
+
+  const unconfirmedAdFreeSku = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_AD_FREE_SKU: 'ait.0000062458.d0bd5054.079e0dec8a.6635518647' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(unconfirmedAdFreeSku.status, 0);
+  assert.match(unconfirmedAdFreeSku.stderr, /must match the confirmed Apps in Toss SKU/);
+
+  const developmentWithoutAdFreeSku = spawnSync(process.execPath, [script, '--development'], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_AD_FREE_SKU: '' },
+    encoding: 'utf8',
+  });
+  assert.equal(developmentWithoutAdFreeSku.status, 0, developmentWithoutAdFreeSku.stderr);
+  assert.match(developmentWithoutAdFreeSku.stderr, /will not offer the ad-free purchase/);
+
   const localShareUrl = spawnSync(process.execPath, [script], {
     cwd: projectRoot,
     env: { ...baseEnvironment, VITE_PUBLIC_APP_URL: 'https://localhost' },
@@ -177,12 +226,52 @@ test('Toss validation checks a configured browser fallback URL while preserving 
   assert.match(viteConfig, /VITE_TOSS_INTERSTITIAL_AD_GROUP_ID/);
   assert.match(viteConfig, /toss-interstitial-ad-group-id/);
   assert.match(viteConfig, /ait-ad-test-interstitial-id/);
+  assert.match(viteConfig, /VITE_TOSS_AD_FREE_SKU/);
+  assert.match(viteConfig, /toss-ad-free-sku/);
+});
+
+test('Toss ad-free SKU metadata is injected only into Toss HTML transforms', async () => {
+  const { default: createViteConfig } = await import('../vite.config.mjs');
+  const source = '<!doctype html><html><head></head><body></body></html>';
+  const confirmedAdFreeSku = 'ait.0000062458.d0bd5054.079e0dec8a.6635518646';
+  const previousAdFreeSku = process.env.VITE_TOSS_AD_FREE_SKU;
+  process.env.VITE_TOSS_AD_FREE_SKU = confirmedAdFreeSku;
+
+  function transformForMode(mode) {
+    const config = createViteConfig({ mode });
+    const plugin = config.plugins.find((candidate) => candidate.name === 'bounc-toss-html');
+    return plugin.transformIndexHtml.handler(source);
+  }
+
+  try {
+    const tossResult = transformForMode('toss');
+    const tossTagNames = tossResult.tags.map((tag) => tag.attrs?.name).filter(Boolean);
+    assert.ok(tossTagNames.includes('toss-ad-free-sku'));
+    assert.ok(
+      tossResult.tags.some(
+        (tag) => tag.attrs?.name === 'toss-ad-free-sku' && tag.attrs?.content === confirmedAdFreeSku,
+      ),
+    );
+    assert.ok(tossResult.tags.some((tag) => tag.attrs?.src === '/toss-bridge.js'));
+
+    for (const mode of ['web', 'android']) {
+      const result = transformForMode(mode);
+      assert.ok(!result.tags.some((tag) => tag.attrs?.name === 'toss-ad-free-sku'));
+      assert.ok(!result.tags.some((tag) => tag.attrs?.src === '/toss-bridge.js'));
+      assert.doesNotMatch(result.html, /toss-miniapp/);
+    }
+  } finally {
+    if (previousAdFreeSku === undefined) delete process.env.VITE_TOSS_AD_FREE_SKU;
+    else process.env.VITE_TOSS_AD_FREE_SKU = previousAdFreeSku;
+  }
 });
 
 test('Android secrets stay ignored and privacy policy reflects actual online data flow', async () => {
-  const [gitignore, privacy, releaseGuide, viteConfig] = await Promise.all([
+  const [gitignore, privacy, terms, deletionGuide, releaseGuide, viteConfig] = await Promise.all([
     readText('.gitignore'),
     readText('public/privacy.html'),
+    readText('public/terms.html'),
+    readText('public/data-deletion.html'),
     readText('ANDROID_RELEASE.md'),
     readText('vite.config.mjs'),
   ]);
@@ -205,13 +294,26 @@ test('Android secrets stay ignored and privacy policy reflects actual online dat
   assert.match(privacy, /Apps in Toss 통합 광고/);
   assert.match(privacy, /Google AdMob/);
   assert.match(privacy, /광고 요청·노출·클릭 정보/);
-  assert.match(privacy, /Google Play·ONEstore용 Android 앱과 일반 웹 배포판에는[^<]+광고 SDK가 포함되지 않으며/);
-  assert.match(privacy, /시행일: 2026년 8월 13일 · 문서 버전 1\.3/);
+  assert.match(privacy, /Google Play·ONEstore용 Android 앱과 일반 웹 배포판에는 광고 또는 인앱결제 SDK가 포함되지 않습니다/);
+  assert.match(privacy, /주문 ID/);
+  assert.match(privacy, /ait\.0000062458\.d0bd5054\.079e0dec8a\.6635518646/);
+  assert.match(privacy, /Toss Native Storage/);
+  assert.match(privacy, /Google LLC/);
+  assert.match(privacy, /Apple Inc\./);
+  assert.match(privacy, /Cloudflare D1에는 결제 정보를 저장하지 않습니다/);
+  assert.match(privacy, /시행일: 2026년 8월 14일 · 문서 버전 1\.4/);
   assert.match(privacy, /hoon@jellysnow\.com/);
+  assert.match(terms, /비소모품/);
+  assert.match(terms, /구매 복원/);
+  assert.match(terms, /환불이 완료되면 광고 제거 권한이 해제되고 광고가 다시 표시/);
+  assert.match(terms, /약관 버전: 2026-08-14-v2/);
+  assert.match(deletionGuide, /데이터 삭제는 결제 취소나 환불 신청이 아닙니다/);
+  assert.match(deletionGuide, /구매 복원/);
   assert.match(releaseGuide, /최초 등록·업로드하기 전까지만/);
   assert.match(releaseGuide, /ALLOWED_ORIGINS/);
   assert.match(viteConfig, /privacy:\s*resolve\(process\.cwd\(\), 'public\/privacy\.html'\)/);
   assert.match(viteConfig, /terms:\s*resolve\(process\.cwd\(\), 'public\/terms\.html'\)/);
+  assert.match(viteConfig, /dataDeletion:\s*resolve\(process\.cwd\(\), 'public\/data-deletion\.html'\)/);
   assert.match(viteConfig, /communityGuidelines:\s*resolve\(process\.cwd\(\), 'public\/community-guidelines\.html'\)/);
   assert.match(viteConfig, /VITE_PUBLIC_APP_URL/);
   assert.match(viteConfig, /'public-app-url'/);

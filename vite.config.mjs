@@ -55,6 +55,7 @@ export default defineConfig(({ mode }) => {
     env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID ||
     (mode === 'toss-dev' ? TOSS_TEST_INTERSTITIAL_AD_GROUP_ID : '')
   ).trim();
+  const tossAdFreeSku = (env.VITE_TOSS_AD_FREE_SKU || '').trim();
   const localApiProxy = (env.LOCAL_API_PROXY_URL || 'http://127.0.0.1:8787').trim();
 
   return {
@@ -69,6 +70,7 @@ export default defineConfig(({ mode }) => {
           index: resolve(process.cwd(), 'public/index.html'),
           privacy: resolve(process.cwd(), 'public/privacy.html'),
           terms: resolve(process.cwd(), 'public/terms.html'),
+          dataDeletion: resolve(process.cwd(), 'public/data-deletion.html'),
           communityGuidelines: resolve(process.cwd(), 'public/community-guidelines.html'),
         },
       },
@@ -125,6 +127,11 @@ export default defineConfig(({ mode }) => {
                     name: 'toss-interstitial-ad-group-id',
                     content: tossInterstitialAdGroupId,
                   },
+                  injectTo: 'head-prepend',
+                },
+                {
+                  tag: 'meta',
+                  attrs: { name: 'toss-ad-free-sku', content: tossAdFreeSku },
                   injectTo: 'head-prepend',
                 },
                 {

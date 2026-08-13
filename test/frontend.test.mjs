@@ -15,6 +15,15 @@ function frontendFunction(name, nextName) {
   return new Function(`${source}; return ${name};`)();
 }
 
+function tossBridgeFunction(name, nextName) {
+  const start = tossBridge.indexOf(`function ${name}(`);
+  const end = tossBridge.indexOf(`\n\nfunction ${nextName}(`, start);
+  assert.notEqual(start, -1, `${name} must exist in the Toss bridge`);
+  assert.notEqual(end, -1, `${nextName} must follow ${name} in the Toss bridge`);
+  const source = tossBridge.slice(start, end);
+  return new Function(`${source}; return ${name};`)();
+}
+
 function embeddedArray(name) {
   const declaration = html.indexOf(`  const ${name} =`);
   const start = html.indexOf('[', declaration);
@@ -198,7 +207,7 @@ test('Toss interstitials fail open and only interrupt eligible official clear tr
   assert.match(html, /releasePointerControl\(\);SFX\.stopContinuous\(\);BGM\.pause\(\)/);
   assert.match(html, /if\(result&&result\.shown===true\)lastInterstitialShownAt=performance\.now\(\)/);
   assert.match(html, /if\(!muted&&!document\.hidden\)BGM\.resume\(\)/);
-  assert.match(html, /if\(adTransitionActive\)return;if\(state==='playing'&&!paused\)togglePause/);
+  assert.match(html, /if\(adTransitionActive\|\|purchaseTransitionActive\)return;if\(state==='playing'&&!paused\)togglePause/);
 
   for (const [startName, endName] of [
     ['restartStage', 'die'],
@@ -218,6 +227,107 @@ test('Toss interstitials fail open and only interrupt eligible official clear tr
       `${startName} must never display an ad`,
     );
   }
+});
+
+test('Toss ad removal is account-bound, permanent, restorable, and fail-closed for ads', () => {
+  assert.match(tossBridge, /meta\[name="toss-ad-free-sku"\]/);
+  assert.doesNotMatch(tossBridge, /ait\.0000062458/, 'the SKU must come from Toss-only HTML metadata');
+  assert.match(tossBridge, /\bIAP,\s*\n\s*SafeArea/);
+  assert.match(tossBridge, /\bStorage,\s*\n\s*User/);
+  assert.match(tossBridge, /product\.type !== 'NON_CONSUMABLE'/);
+  assert.match(tossBridge, /displayAmount: String\(product\.displayAmount \|\| ''\)/);
+
+  assert.match(tossBridge, /grant\?\.userHash !== identity\.userHash/);
+  assert.match(tossBridge, /userHash: identity\.userHash/);
+  assert.match(tossBridge, /rawStoredGrant && !storedGrant && !\(await removeStoredGrant\(Storage\)\)/);
+  assert.match(tossBridge, /if \(!normalizedOrderId \|\| !identity\.userHash\) return false/);
+  const grantWrite = tossBridge.slice(
+    tossBridge.indexOf('async function writeStoredGrant('),
+    tossBridge.indexOf('\n\nasync function removeStoredGrant('),
+  );
+  assert.ok(
+    grantWrite.indexOf('await Storage.setItem(') < grantWrite.indexOf('return true'),
+    'a grant may return true only after native Storage.setItem resolves',
+  );
+  assert.match(
+    tossBridge,
+    /async function processAdFreeProductGrant[\s\S]*?const stored = await writeStoredGrant[\s\S]*?if \(!stored\)[\s\S]*?return false;[\s\S]*?setPurchaseState\('ad-free'[\s\S]*?return true;/,
+  );
+
+  assert.match(tossBridge, /await synchronizeAdFreeEntitlement\('startup'\)/);
+  assert.match(tossBridge, /restoreAdFreePurchase[\s\S]*?synchronizeAdFreeEntitlement\('restore'\)/);
+  assert.match(tossBridge, /const pendingResult = await IAP\.getPendingOrders\(\)/);
+  assert.match(tossBridge, /await IAP\.completeProductGrant\(\{\s*params: \{ orderId: order\.orderId \}/);
+  assert.match(tossBridge, /const history = await IAP\.getCompletedOrRefundedOrders\(\);/);
+  assert.doesNotMatch(
+    tossBridge,
+    /await IAP\.getCompletedOrRefundedOrders\([^)]/,
+    'SDK 3.0.2 history lookup must not receive an unsupported pagination argument',
+  );
+  assert.match(tossBridge, /if \(history\?\.hasNext && matchingHistory\.length === 0\)[\s\S]*?storedGrant \? 'ad-free' : 'unknown'/);
+  assert.match(tossBridge, /message: 'history-incomplete'/);
+  assert.match(tossBridge, /order\.status === 'REFUNDED'/);
+
+  const latestStatusPerOrder = tossBridgeFunction('latestStatusPerOrder', 'purchaseErrorCode');
+  const folded = latestStatusPerOrder([
+    { orderId: 'order-a', status: 'COMPLETED', date: '2026-01-01T00:00:00Z' },
+    { orderId: 'order-a', status: 'REFUNDED', date: '2026-02-01T00:00:00Z' },
+    { orderId: 'order-b', status: 'COMPLETED', date: '2026-01-15T00:00:00Z' },
+  ]);
+  assert.deepEqual(
+    folded.map(({ orderId, status }) => ({ orderId, status })),
+    [
+      { orderId: 'order-a', status: 'REFUNDED' },
+      { orderId: 'order-b', status: 'COMPLETED' },
+    ],
+    'a refunded old order must not cancel a separate completed repurchase',
+  );
+  assert.match(
+    tossBridge,
+    /matchingHistory\.filter\(\(order\) => order\.status === 'COMPLETED'\)/,
+  );
+  assert.match(tossBridge, /if \(activePendingOrder \|\| activeCompletedOrder\)/);
+  assert.match(tossBridge, /!refundedOrderIds\.has\(String\(order\.orderId\)\)/);
+
+  const purchaseErrorCode = tossBridgeFunction('purchaseErrorCode', 'synchronizeAdFreeEntitlement');
+  assert.match(purchaseErrorCode({ code: 'PAYMENT_PENDING' }), /PAYMENT_PENDING/);
+  assert.match(purchaseErrorCode({ code: 'UNKNOWN', message: 'USER_CANCELED' }), /USER_CANCELED/);
+  assert.match(purchaseErrorCode('USER_CANCELLED'), /USER_CANCELLED/);
+
+  assert.match(tossBridge, /if \(purchasePromise\) return purchasePromise/);
+  assert.match(tossBridge, /purchaseState\.status !== 'ad-supported'/);
+  assert.match(tossBridge, /const cleanupOnce = \(\) =>/);
+  assert.match(tossBridge, /cleanupFinished \|\| typeof cleanup !== 'function'/);
+  assert.match(tossBridge, /activePurchaseCancels\.delete\(cancel\)/);
+  assert.match(tossBridge, /for \(const cancel of \[\.\.\.activePurchaseCancels\]\) cancel\(\)/);
+  assert.match(
+    tossBridge,
+    /if \(isTossMiniapp\) \{\s*window\.addEventListener\('pageshow', \(event\) => \{[\s\S]*?if \(event\.persisted\) window\.location\.reload\(\)/,
+  );
+  assert.match(tossBridge, /code\.includes\('PAYMENT_PENDING'\)/);
+  assert.match(tossBridge, /message: 'payment-pending'/);
+  assert.match(tossBridge, /code\.includes\('USER_CANCELED'\)/);
+  assert.match(tossBridge, /message: 'user-canceled'/);
+  assert.match(tossBridge, /return purchaseState\.status === 'ad-supported'/);
+  assert.match(tossBridge, /!isConfirmedAdSupported\(\)/);
+  assert.match(tossBridge, /if \(status !== 'ad-supported'\) disableInterstitial\(\)/);
+
+  assert.match(html, /\.toss-purchase\{display:none/);
+  assert.match(html, /html\.toss-miniapp \.toss-purchase\{display:grid\}/);
+  assert.match(html, /id="tossPurchasePanel"/);
+  assert.match(html, /id="adFreePurchaseBtn" disabled>광고 제거 · 확인 중/);
+  assert.match(html, /id="adFreeRestoreBtn" disabled>구매 복원/);
+  assert.match(html, /const priceLabel=displayAmount\?`광고 제거 · \$\{displayAmount\}`/);
+  assert.match(html, /'payment-pending':'결제 승인을 기다리고 있어요/);
+  assert.match(html, /'user-canceled':'결제가 취소됐어요/);
+  assert.match(html, /purchaseAdFree:purchases\?\.restoreAdFreePurchase/);
+  assert.match(html, /purchaseTransitionActive=true;[\s\S]*?SFX\.stopContinuous\(\);BGM\.pause\(\)/);
+  assert.match(html, /ui\.adFreePurchaseBtn\.onclick=.*runTossPurchaseAction\('purchase'\)/);
+  assert.match(html, /ui\.adFreeRestoreBtn\.onclick=.*runTossPurchaseAction\('restore'\)/);
+  assert.match(html, /if\(adTransitionActive\|\|purchaseTransitionActive\)return/);
+  assert.match(html, /!adTransitionActive&&!purchaseTransitionActive&&!muted/);
+  assert.match(html, /function restartStage\(fromDeath=false\) \{\s*if\(purchaseTransitionActive\)return/);
+  assert.match(html, /function togglePause\(force,silent=false\) \{\s*if\(purchaseTransitionActive\|\|state!=='playing'\)return/);
 });
 
 test('two bundled BGM tracks form a gesture-unlocked background playlist', async () => {

@@ -1,6 +1,6 @@
 # Google Play·ONEstore 동시 출시 시트
 
-기준일: 2026-08-13
+기준일: 2026-08-14
 
 ## 공통 식별자
 
@@ -13,7 +13,7 @@
 | 유형 | 게임 |
 | 가격 | 무료 |
 | 광고 | Google Play·ONEstore Android 앱: 없음 / 토스 미니앱: Apps in Toss 통합 광고 사용 |
-| 인앱결제·구독 | 없음 |
+| 인앱결제·구독 | Google Play·ONEstore Android 앱: 없음 / 토스 미니앱: 광고 제거 1회성 비소모품(구독 아님) |
 | 계정·로그인 | 없음 |
 | 법적 운영자 | 김태훈 |
 | 고객지원 이메일 | `hoon@jellysnow.com` |
@@ -22,16 +22,26 @@
 
 Google Play의 기존 개발자 계정에는 이미 프로덕션 앱이 있으므로 신규 개인 계정용 12명·14일 테스트 게이트 대상이 아닐 가능성이 높습니다. 콘솔의 실제 production access 상태를 마지막으로 확인합니다.
 
-## 배포판별 광고 구성
+## 배포판별 광고·결제 구성
 
-| 배포판 | 광고 여부 | 구현·신고 기준 |
-| --- | --- | --- |
-| Google Play Android 앱 | 없음 | Apps in Toss·Google AdMob 광고 SDK를 포함하지 않으며 Google Play의 광고 포함 여부는 `아니요`로 유지 |
-| ONEstore Android 앱 | 없음 | Apps in Toss·Google AdMob 광고 SDK를 포함하지 않으며 광고 포함 여부는 `아니요`로 유지 |
-| 일반 웹 배포판 | 없음 | 광고 SDK와 광고 그룹 ID를 주입하지 않음 |
-| 토스 미니앱 | 있음 | Apps in Toss 통합 광고(Toss Ads/Google AdMob) 전면 광고 사용. 콘솔 운영 광고 그룹 ID와 토스용 개인정보 고지를 적용 |
+| 배포판 | 광고 | 유료 상품 | 구현·신고 기준 |
+| --- | --- | --- | --- |
+| Google Play Android 앱 | 없음 | 없음 | Apps in Toss·Google AdMob 광고 SDK와 Apps in Toss 결제 SDK를 포함하지 않음. Google Play의 광고 포함 여부는 `아니요`, 인앱 상품은 없음으로 유지 |
+| ONEstore Android 앱 | 없음 | 없음 | Apps in Toss·Google AdMob 광고 SDK와 Apps in Toss 결제 SDK를 포함하지 않음. 광고 포함 여부는 `아니요`, 인앱 상품은 없음으로 유지 |
+| 일반 웹 배포판 | 없음 | 없음 | 광고 SDK·광고 그룹 ID·Apps in Toss 결제 SDK·광고 제거 SKU를 주입하지 않음 |
+| 토스 미니앱 | 있음 | 광고 제거 1회성 비소모품 | Apps in Toss 통합 광고(Toss Ads/Google AdMob)와 Apps in Toss 인앱결제를 사용. 운영 광고 그룹 ID, 확정 SKU 및 토스용 광고·결제 고지를 적용 |
 
-Android 스토어용 AAB/APK와 토스용 `.ait`는 같은 게임 소스를 사용하지만 광고 구성은 배포판별로 분리합니다. 토스 광고 추가만을 이유로 이미 등록된 Google Play·ONEstore Android 앱의 광고 여부나 Data safety 답변을 변경하지 않습니다.
+Android 스토어용 AAB/APK와 토스용 `.ait`는 같은 게임 소스를 사용하지만 광고와 결제 구성은 배포판별로 분리합니다. 토스 광고·광고 제거 상품 추가만을 이유로 이미 등록된 Google Play·ONEstore Android 앱의 광고 여부, 인앱 상품 또는 Data safety 답변을 변경하지 않습니다.
+
+### 토스 광고 제거 상품
+
+- SKU: `ait.0000062458.d0bd5054.079e0dec8a.6635518646`
+- 유형: 1회성 비소모품(`NON_CONSUMABLE`), 구독 아님
+- 효력: 펭귄 바운스가 직접 표시하는 토스 미니앱 전면 광고를 제거하며, 토스·결제·외부 서비스 화면까지 제거한다는 뜻은 아님
+- 권한 확인·복원: Apps in Toss 주문 이력과 기기의 Toss Native Storage 권한 캐시를 사용. 현재 서버 entitlement 또는 mTLS 검증은 구현하지 않았고 Cloudflare D1에는 주문 ID·SKU·결제 상태를 저장하지 않음
+- 환불: Android는 토스 구매 내역, iOS는 Apple의 환불 절차를 따름. 환불 완료가 확인되면 광고 제거 권한을 해제하고 광고를 다시 표시함
+- 데이터 삭제: 기기의 권한 캐시는 삭제될 수 있지만 주문 이력에서 구매 복원을 시도할 수 있음. 데이터 삭제는 결제 취소나 환불 신청이 아님
+- 처리 사업자: 결제·주문·환불 과정에서 Toss, Google LLC, Apple Inc.가 각 정책과 관계 법령에 따라 정보를 처리·보관할 수 있음
 
 ## 스토어 문구
 
@@ -60,7 +70,7 @@ Android 스토어용 AAB/APK와 토스용 `.ait`는 같은 게임 소스를 사�
 
 맵을 한 칸이라도 고치면 이전 클리어 인증은 무효가 됩니다. 완성한 맵을 직접 깨고 온라인에 게시해 다른 이용자에게 도전장을 보내보세요.
 
-기본 스테이지와 맵 편집은 계정 없이 즐길 수 있습니다. 온라인 맵 목록·검색·검증·게시·공유 기능은 인터넷 연결이 필요합니다. Google Play·ONEstore용 Android 앱에는 광고와 인앱 결제가 없습니다. 토스 미니앱 배포판에는 Apps in Toss 통합 광고가 표시될 수 있으며 인앱 결제는 없습니다.
+기본 스테이지와 맵 편집은 계정 없이 즐길 수 있습니다. 온라인 맵 목록·검색·검증·게시·공유 기능은 인터넷 연결이 필요합니다. Google Play·ONEstore용 Android 앱에는 광고와 인앱 결제가 없습니다. 토스 미니앱 배포판에는 Apps in Toss 통합 광고가 표시될 수 있으며, 1회성 비소모품 광고 제거 상품을 구매하거나 복원할 수 있습니다.
 
 ### 검색어·태그 후보
 
@@ -82,9 +92,9 @@ Android 스토어용 AAB/APK와 토스용 `.ait`는 같은 게임 소스를 사�
 | 이용자 상호작용 | 예 — 비동기 공개 맵 공유 |
 | 채팅·DM·음성·사진 공유 | 아니오 |
 | 위치 공유·무제한 웹 접근 | 아니오 |
-| 디지털 구매 | 아니오 |
+| 디지털 구매 | Google Play·ONEstore Android 앱: 아니오 / 토스 미니앱: 예 — 광고 제거 1회성 비소모품 |
 
-두 스토어의 IARC 답변을 동일하게 유지합니다. 온라인 맵은 UGC이므로 게시 전 이용규칙 동의, 신고, 제작자·맵 숨김, 본인 삭제와 운영자 조치 기능이 출시 빌드에 실제로 있어야 합니다.
+Google Play와 ONEstore Android 앱은 디지털 구매가 없으므로 두 스토어의 IARC 답변을 동일하게 유지합니다. 토스 미니앱은 광고 제거 상품이 있으므로 앱인토스 콘솔의 구매 관련 답변과 고지를 별도로 적용하고, 기존 등급분류 증빙에 영향을 주는지 제출 직전에 콘솔 기준으로 확인합니다. 온라인 맵은 UGC이므로 게시 전 이용규칙 동의, 신고, 제작자·맵 숨김, 본인 삭제와 운영자 조치 기능이 출시 빌드에 실제로 있어야 합니다.
 
 Google Play 출시판의 게임물관리위원회 자체등급분류번호는 `GOOG-SG-260811-0324`이며, 2026-08-11 전체이용가·폭력성으로 확인되었습니다.
 
@@ -107,7 +117,7 @@ Google Play 출시판의 게임물관리위원회 자체등급분류번호는 `G
 | 기기 또는 기타 ID | 예 | 선택 | 무작위 작성자 토큰의 파생 ID, 소유 확인·신고 중복 방지·남용 방지 |
 | IP 주소 | 예 | 자동 | Cloudflare의 요청 전달·보안과 요청 횟수 제한. 앱은 원문을 D1에 저장하지 않고 해시 식별값만 일반·쓰기 요청의 임시 제한과 신고 제한에 사용 |
 
-Google Play·ONEstore용 Android 앱에서는 이메일, 전화번호, 주소, 금융·건강정보, 연락처, 메시지, 사진·영상·음성, 파일, 캘린더, 설치 앱, 웹 탐색, 광고 ID와 광고 SDK 진단 데이터를 수집하지 않습니다. 토스 미니앱에서는 Apps in Toss 통합 광고 제공 과정에서 광고 또는 기기 식별정보, IP 주소, 앱·기기·OS 정보, 광고 요청·노출·클릭·진단 정보가 처리될 수 있으므로 토스 콘솔과 개인정보처리방침 v1.3에 별도로 고지합니다.
+Google Play·ONEstore용 Android 앱에서는 이메일, 전화번호, 주소, 금융·건강정보, 연락처, 메시지, 사진·영상·음성, 파일, 캘린더, 설치 앱, 웹 탐색, 광고 ID와 광고 SDK 진단 데이터, 토스 결제 주문 정보를 수집하지 않습니다. 토스 미니앱에서는 Apps in Toss 통합 광고 제공 과정에서 광고 또는 기기 식별정보, IP 주소, 앱·기기·OS 정보, 광고 요청·노출·클릭·진단 정보가 처리될 수 있습니다. 광고 제거 구매 과정에서는 주문 ID, SKU, 주문 상태, 구매·환불 시각, 상품명·금액·통화와 권한 상태가 Apps in Toss SDK, Toss Native Storage 및 Toss·Google·Apple의 주문·환불 시스템에서 처리될 수 있으므로 토스 콘솔, 개인정보처리방침 v1.4와 이용약관 v2에 별도로 고지합니다. Cloudflare D1에는 이 결제 정보를 저장하지 않습니다.
 
 ## 제출 이미지
 
@@ -116,6 +126,7 @@ Google Play·ONEstore용 Android 앱에서는 이메일, 전화번호, 주소, �
 - ONEstore 아이콘: `release-assets/penguin-bounce-icon-onestore-512.png`
 - ONEstore 대표 그래픽: `release-assets/penguin-bounce-feature-onestore-1024x578.jpg`
 - 공통 실제 스크린샷: `release-assets/penguin-bounce-store-screenshot-01-home-1280x720.png` ~ `03-editor-1280x720.png`
+- 토스 광고 제거 상품 이미지 후보: `release-assets/penguin-bounce-ad-free-product-1024.png` — 콘솔 규격과 권리 표시를 확인한 뒤 사용
 
 ## 바이너리·서명
 
@@ -132,6 +143,8 @@ Google Play·ONEstore용 Android 앱에서는 이메일, 전화번호, 주소, �
 - Cloudflare 로그인·Wrangler 연결 승인과 실제 API/개인정보처리방침 HTTPS URL
 - Google Play의 정책·미국 수출법 선언
 - ONEstore 회원가입 약관, 이메일·본인 인증과 판매자 정보
+- 앱인토스 인앱결제·판매자·정산 약관, 판매자 정보, 광고 제거 상품의 가격·판매 상태와 환불 문의 경로
+- 토스 iOS·Android 실기기에서 구매 성공·취소·실패·보류, 재실행·기기 변경 후 복원, 환불 뒤 광고 재개 확인
 - IARC 최종 제출과 각 스토어의 출시 버튼
 
 계정 비밀번호, 인증번호, 서명키 암호, `PUBLISH_SECRET`, `MODERATION_TOKEN`은 이 문서나 Git에 넣지 않습니다.
