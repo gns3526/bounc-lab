@@ -3656,7 +3656,9 @@
   }
 
   function isOfficialInterstitialCandidate(clearCount,sessionElapsedMs,sinceLastAdMs){
-    return clearCount>0&&clearCount%5===0&&sessionElapsedMs>=120000&&sinceLastAdMs>=180000;
+    // 첫 플레이 흐름은 지키되, 이후에는 공식 스테이지 3개 클리어마다
+    // 자연스러운 전환 지점에서만 최대 90초에 한 번 광고를 노출한다.
+    return clearCount>0&&clearCount%3===0&&sessionElapsedMs>=60000&&sinceLastAdMs>=90000;
   }
 
   function shouldShowOfficialInterstitial(now=performance.now()){

@@ -187,11 +187,11 @@ test('Toss interstitials fail open and only interrupt eligible official clear tr
     'isOfficialInterstitialCandidate',
     'shouldShowOfficialInterstitial',
   );
-  assert.equal(isCandidate(5, 120_000, Infinity), true);
-  assert.equal(isCandidate(10, 121_000, 180_000), true);
-  assert.equal(isCandidate(4, 999_999, Infinity), false);
-  assert.equal(isCandidate(5, 119_999, Infinity), false);
-  assert.equal(isCandidate(5, 999_999, 179_999), false);
+  assert.equal(isCandidate(3, 60_000, Infinity), true);
+  assert.equal(isCandidate(6, 61_000, 90_000), true);
+  assert.equal(isCandidate(2, 999_999, Infinity), false);
+  assert.equal(isCandidate(3, 59_999, Infinity), false);
+  assert.equal(isCandidate(3, 999_999, 89_999), false);
 
   assert.match(
     html,

@@ -66,7 +66,7 @@ https://<appName>.private-web.tossmini.com
 
 ### 2-4. 운영용 전면 광고 그룹 ID — 필수
 
-토스 미니앱 배포판에서만 Apps in Toss 통합 광고를 사용합니다. 앱인토스 콘솔에서 펭귄 바운스용 **운영 전면 광고 그룹**을 만들고 발급된 ID를 빌드 환경의 `VITE_TOSS_INTERSTITIAL_AD_GROUP_ID`에 설정합니다.
+토스 미니앱 배포판에서만 Apps in Toss 통합 광고를 사용합니다. 펭귄 바운스의 운영 전면 광고 그룹 ID는 `ait.v2.live.53aa326097054991`이며, 빌드 환경의 `VITE_TOSS_INTERSTITIAL_AD_GROUP_ID`에 설정합니다. 공식 스테이지 3개 클리어마다 후보가 되며, 세션 시작 60초 이후이면서 직전 실제 광고 노출로부터 90초 이상 지난 자연스러운 스테이지 전환 지점에서만 노출합니다.
 
 - `npm run build:toss`는 ID 누락·공백, `ait-ad-test-interstitial-id` 같은 테스트 ID, `replace-with...` 같은 예시값을 거부합니다.
 - `npm run build:toss:dev`는 변수를 비워 두면 `ait-ad-test-interstitial-id`를 자동 사용합니다. 개발·QR 확인용 테스트 ID를 운영 번들에 넣지 않습니다.
@@ -191,10 +191,10 @@ https://<appName>.private-web.tossmini.com
 - [ ] 최종 한글 앱 이름: `________________`
 - [ ] 최종 `appName`: `penguin-bounce`
 - [ ] 운영 API URL: `https://________________`
-- [ ] 운영 전면 광고 그룹 ID 발급 및 `VITE_TOSS_INTERSTITIAL_AD_GROUP_ID` 설정
-- [ ] 운영 번들에 테스트 광고 ID·예시값이 없는지 검증 완료
+- [x] 운영 전면 광고 그룹 ID `ait.v2.live.53aa326097054991` 발급 및 `VITE_TOSS_INTERSTITIAL_AD_GROUP_ID` 설정
+- [x] 운영 번들 `20260818-7`에 운영 광고 ID가 있고 테스트 광고 ID·예시값이 없는지 검증 완료
 - [ ] 광고 제거 상품을 비소모품으로 등록하고 SKU `ait.0000062458.d0bd5054.079e0dec8a.6635518646` 및 판매 상태 확인
-- [ ] `VITE_TOSS_AD_FREE_SKU`에 확정 SKU를 설정하고 운영 번들의 `toss-ad-free-sku` 메타 태그 확인
+- [x] `VITE_TOSS_AD_FREE_SKU`에 확정 SKU를 설정하고 운영 번들의 `toss-ad-free-sku` 메타 태그 확인
 - [ ] 앱인토스 인앱결제·판매자·정산 약관, 판매자 정보와 환불 문의 경로 완료
 - [ ] 고객문의 이메일: `________________`
 - [ ] 600×600 로고 완료
