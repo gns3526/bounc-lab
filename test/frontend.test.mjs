@@ -145,6 +145,30 @@ test('mobile editor keeps essential controls readable and accessible', () => {
   assert.match(html, /env\(safe-area-inset-bottom\)/);
 });
 
+test('touch is the default control and rapid left-right pointer handoff is not dropped', () => {
+  assert.match(
+    html,
+    /safeStore\.get\('penguinBoundControlMode','touch'\) === 'joystick' \? 'joystick' : 'touch'/,
+  );
+  assert.match(
+    html,
+    /if\(controlPointer!==null\)\{\s*if\(controlMode!=='touch'\|\|e\.pointerId===controlPointer\)return;[\s\S]*?gameWrap\.releasePointerCapture\(previousPointer\)/,
+  );
+  assert.match(html, /controlPointer=e\.pointerId;[\s\S]*?updateTouchControl\(e\.clientX\)/);
+});
+
+test('folded portrait editor scrolls inside the safe viewport to reach bottom actions', () => {
+  assert.match(
+    html,
+    /\.editor-layout\{[\s\S]*?overflow:auto;overscroll-behavior:contain;[\s\S]*?touch-action:pan-y/,
+  );
+  assert.match(
+    html,
+    /overflow-x:hidden;overflow-y:auto;padding-bottom:max\(12px,env\(safe-area-inset-bottom,0px\)\)/,
+  );
+  assert.match(html, /canvas\.editor-canvas[^}]*touch-action:none/);
+});
+
 test('Apps in Toss hooks cover identity, sharing, safe layout, and confirmed exit', () => {
   assert.match(html, /meta name="api-base-url"/);
   assert.match(html, /meta name="public-app-url"/);

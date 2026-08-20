@@ -374,7 +374,11 @@
       grid-template-rows:auto minmax(0,1fr);
       overflow:hidden;
     }
-    .editor-layout,.editor-map-pane,.editor-side{min-width:0;min-height:0}
+    .editor-layout{
+      min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;
+      touch-action:pan-y;-webkit-overflow-scrolling:touch;scrollbar-gutter:stable;
+    }
+    .editor-map-pane,.editor-side{min-width:0;min-height:0}
     .editor-tools{touch-action:manipulation}
 
     @media (max-width:900px), (max-height:650px){
@@ -422,7 +426,10 @@
       .editor-card{width:100%;height:100%;max-height:100%;padding:8px}
       .editor-head{margin-bottom:4px}
       .editor-head h2{font-size:17px}
-      .editor-layout{grid-template-columns:1fr;grid-template-rows:auto auto;gap:5px;align-content:start;overflow:hidden}
+      .editor-layout{
+        grid-template-columns:1fr;grid-template-rows:auto auto;gap:5px;align-content:start;
+        overflow-x:hidden;overflow-y:auto;padding-bottom:max(12px,env(safe-area-inset-bottom,0px));
+      }
       .editor-map-pane{display:grid;grid-template-rows:auto auto}
       .editor-canvas-wrap{width:min(100%,78dvw,340px);height:auto;justify-self:center}
       .editor-status{margin-top:4px}
@@ -2523,7 +2530,7 @@
   let exitReturnState='menu';
   let exitReturnPaused=false;
   let muted = safeStore.get('penguinBoundMutedSoundpackV2','0') === '1';
-  let controlMode = safeStore.get('penguinBoundControlMode','joystick') === 'touch' ? 'touch' : 'joystick';
+  let controlMode = safeStore.get('penguinBoundControlMode','touch') === 'joystick' ? 'joystick' : 'touch';
   let accumulator = 0;
   let lastTime = performance.now();
   let stageTime = 0;
@@ -4410,7 +4417,15 @@
   }
 
   function beginPointerControl(e){
-    if(state!=='playing'||paused||controlPointer!==null||!isGameplayPointerTarget(e.target))return;
+    if(state!=='playing'||paused||!isGameplayPointerTarget(e.target))return;
+    // 빠르게 반대쪽을 누르면 새 pointerdown이 이전 pointerup보다 먼저 올 수 있다.
+    // 터치 모드에서는 최신 손가락이 즉시 조작권을 넘겨받아 입력이 씹히지 않게 한다.
+    if(controlPointer!==null){
+      if(controlMode!=='touch'||e.pointerId===controlPointer)return;
+      const previousPointer=controlPointer;
+      controlPointer=null;
+      try{gameWrap.releasePointerCapture(previousPointer);}catch(_){}
+    }
     e.preventDefault();
     controlPointer=e.pointerId;
     try{gameWrap.setPointerCapture(e.pointerId);}catch(_){}
