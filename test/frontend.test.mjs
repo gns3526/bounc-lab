@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 const tossBridge = await readFile(new URL('../public/toss-bridge.js', import.meta.url), 'utf8');
 const staticHeaders = await readFile(new URL('../public/_headers', import.meta.url), 'utf8');
+const viteConfig = await readFile(new URL('../vite.config.mjs', import.meta.url), 'utf8');
 
 function frontendFunction(name, nextName) {
   const start = html.indexOf(`  function ${name}(`);
@@ -13,6 +15,14 @@ function frontendFunction(name, nextName) {
   assert.notEqual(end, -1, `${nextName} must follow ${name}`);
   const source = html.slice(start, end);
   return new Function(`${source}; return ${name};`)();
+}
+
+function frontendSource(name, nextName) {
+  const start = html.indexOf(`  function ${name}(`);
+  const end = html.indexOf(`\n\n  function ${nextName}(`, start);
+  assert.notEqual(start, -1, `${name} must exist`);
+  assert.notEqual(end, -1, `${nextName} must follow ${name}`);
+  return html.slice(start, end);
 }
 
 function tossBridgeFunction(name, nextName) {
@@ -32,6 +42,14 @@ function embeddedArray(name) {
   assert.notEqual(start, -1, `${name} array must start`);
   assert.notEqual(end, -1, `${name} array must end`);
   return new Function(`return (${html.slice(start, end + 1)});`)();
+}
+
+function skinFixture() {
+  const start = html.indexOf('  const SKINS=Object.freeze(');
+  const end = html.indexOf('\n  const SKIN_BY_ID=', start);
+  assert.notEqual(start, -1, 'SKINS declaration must exist');
+  assert.notEqual(end, -1, 'SKINS declaration must be self-contained');
+  return new Function(`${html.slice(start, end)}; return SKINS;`)();
 }
 
 function officialDangerFixture() {
@@ -181,7 +199,8 @@ test('Apps in Toss hooks cover identity, sharing, safe layout, and confirmed exi
   assert.match(html, /replay\.totalTicks>=MAX_VERIFICATION_REPLAY_TICKS/);
   assert.match(html, /맵 게시용 클리어는 1분 안에 완료해야 합니다/);
   assert.match(html, /new URL\(publicAppUrl\|\|location\.href,location\.href\)/);
-  assert.match(html, /addEventListener\('bounc:toss-back',openExitDialog\)/);
+  assert.match(html, /addEventListener\('bounc:toss-back',\(\)=>\{/);
+  assert.match(html, /!ui\.skinOverlay\.classList\.contains\('hidden'\)/);
   assert.match(html, /id="exitOverlay" role="dialog" aria-modal="true"/);
   assert.match(html, /document\.hidden/);
   assert.match(html, /SFX\.stopContinuous\(\)/);
@@ -194,7 +213,7 @@ test('Toss interstitials fail open and only interrupt eligible official clear tr
   assert.match(tossBridge, /loadFullScreenAd/);
   assert.match(tossBridge, /showFullScreenAd/);
   assert.match(tossBridge, /INTERSTITIAL_TIMEOUT_MS = 90_000/);
-  assert.match(tossBridge, /Ads: Object\.freeze\(\{ preloadInterstitial, showInterstitial \}\)/);
+  assert.match(tossBridge, /Ads: Object\.freeze\(\{[\s\S]*?preloadInterstitial,[\s\S]*?showInterstitial,[\s\S]*?preloadRewarded,[\s\S]*?showRewarded/);
   assert.match(tossBridge, /if \(!interstitialLoaded\) \{[\s\S]*?return Promise\.resolve\(false\)/);
   assert.match(tossBridge, /options: \{ adGroupId: interstitialAdGroupId \}/);
   assert.match(tossBridge, /event\?\.type === 'loaded'/);
@@ -205,7 +224,7 @@ test('Toss interstitials fail open and only interrupt eligible official clear tr
   assert.match(tossBridge, /removeEventListener\('visibilitychange', handleVisibilityChange\)/);
   assert.match(tossBridge, /bridgeDisposed = true/);
   assert.match(tossBridge, /activeInterstitialCancels\.delete\(cancel\)/);
-  assert.match(tossBridge, /interstitialShowPromise = null;\s*void preloadInterstitial\(\)/);
+  assert.match(tossBridge, /interstitialShowPromise = null;[\s\S]*?fullScreenShowOwner === 'interstitial'[\s\S]*?void preloadInterstitial\(\)/);
 
   const isCandidate = frontendFunction(
     'isOfficialInterstitialCandidate',
@@ -231,7 +250,7 @@ test('Toss interstitials fail open and only interrupt eligible official clear tr
   assert.match(html, /releasePointerControl\(\);SFX\.stopContinuous\(\);BGM\.pause\(\)/);
   assert.match(html, /if\(result&&result\.shown===true\)lastInterstitialShownAt=performance\.now\(\)/);
   assert.match(html, /if\(!muted&&!document\.hidden\)BGM\.resume\(\)/);
-  assert.match(html, /if\(adTransitionActive\|\|purchaseTransitionActive\)return;if\(state==='playing'&&!paused\)togglePause/);
+  assert.match(html, /if\(adTransitionActive\|\|purchaseTransitionActive\|\|rewardTransitionActive\)return;if\(state==='playing'&&!paused\)togglePause/);
 
   for (const [startName, endName] of [
     ['restartStage', 'die'],
@@ -334,7 +353,7 @@ test('Toss ad removal is account-bound, permanent, restorable, and fail-closed f
   assert.match(tossBridge, /message: 'user-canceled'/);
   assert.match(tossBridge, /return purchaseState\.status === 'ad-supported'/);
   assert.match(tossBridge, /!isConfirmedAdSupported\(\)/);
-  assert.match(tossBridge, /if \(status !== 'ad-supported'\) disableInterstitial\(\)/);
+  assert.match(tossBridge, /if \(status !== 'ad-supported'\) \{\s*disableInterstitial\(\);\s*disableRewarded\(\)/);
 
   assert.match(html, /\.toss-purchase\{display:none/);
   assert.match(html, /html\.toss-miniapp \.toss-purchase\{display:grid\}/);
@@ -348,10 +367,10 @@ test('Toss ad removal is account-bound, permanent, restorable, and fail-closed f
   assert.match(html, /purchaseTransitionActive=true;[\s\S]*?SFX\.stopContinuous\(\);BGM\.pause\(\)/);
   assert.match(html, /ui\.adFreePurchaseBtn\.onclick=.*runTossPurchaseAction\('purchase'\)/);
   assert.match(html, /ui\.adFreeRestoreBtn\.onclick=.*runTossPurchaseAction\('restore'\)/);
-  assert.match(html, /if\(adTransitionActive\|\|purchaseTransitionActive\)return/);
-  assert.match(html, /!adTransitionActive&&!purchaseTransitionActive&&!muted/);
-  assert.match(html, /function restartStage\(fromDeath=false\) \{\s*if\(purchaseTransitionActive\)return/);
-  assert.match(html, /function togglePause\(force,silent=false\) \{\s*if\(purchaseTransitionActive\|\|state!=='playing'\)return/);
+  assert.match(html, /if\(adTransitionActive\|\|purchaseTransitionActive\|\|rewardTransitionActive\)return/);
+  assert.match(html, /!adTransitionActive&&!purchaseTransitionActive&&!rewardTransitionActive&&!muted/);
+  assert.match(html, /function restartStage\(fromDeath=false\) \{\s*if\(purchaseTransitionActive\|\|rewardTransitionActive\)return/);
+  assert.match(html, /function togglePause\(force,silent=false\) \{\s*if\(purchaseTransitionActive\|\|rewardTransitionActive\|\|state!=='playing'\)return/);
 });
 
 test('two bundled BGM tracks form a gesture-unlocked background playlist', async () => {
@@ -477,7 +496,94 @@ test('pause menu exposes every control directly below the break heading', () => 
   assert.match(pauseMarkup, /id="pauseSoundBtn"/);
   assert.match(pauseMarkup, /id="pauseSelectBtn"/);
   assert.match(pauseMarkup, /id="pauseEditorBtn"/);
+  assert.match(pauseMarkup, /id="pauseSkinBtn"/);
   assert.doesNotMatch(pauseMarkup, /<details|<summary|게임 설정과 다른 메뉴/);
+});
+
+test('ten special skins are cosmetic, fold-scrollable, and granted only by rewarded completion', () => {
+  const skinRegistry=html.match(/const SKINS=Object\.freeze\(\[([\s\S]*?)\]\);/)?.[1]||'';
+  const skins=skinFixture();
+  const skinIds=skins.map(skin=>skin.id);
+  const specials=skins.filter(skin=>skin.id!=='penguin');
+  const orbs=specials.filter(skin=>skin.form==='orb');
+  const characters=specials.filter(skin=>skin.form==='character');
+  assert.equal(skinIds.length,11,'the free penguin plus ten special skins must exist');
+  assert.equal(new Set(skinIds).size,skinIds.length,'skin ids must be unique');
+  assert.equal(skinIds[0],'penguin');
+  assert.equal(orbs.length,1,'the special roster must contain exactly one ball');
+  assert.equal(orbs[0].id,'chrome');
+  assert.equal(characters.length,9,'the other nine specials must be character penguins');
+  assert.equal(new Set(characters.map(skin=>skin.design)).size,9,'character silhouettes need distinct render designs');
+  assert.ok(characters.some(skin=>skin.design==='robo'&&/로보/.test(skin.name)));
+  assert.ok(characters.some(skin=>skin.design==='princess'&&/공주/.test(skin.name)));
+  assert.ok(characters.some(skin=>skin.design==='inferno_warrior'&&/전사/.test(skin.name)));
+  const rarityCounts=skins.reduce((counts,skin)=>({...counts,[skin.rarity]:(counts[skin.rarity]||0)+1}),{});
+  assert.deepEqual(rarityCounts,{common:1,rare:1,legendary:7,epic:2});
+  assert.ok(specials.filter(skin=>skin.rarity==='legendary').length>specials.filter(skin=>skin.rarity!=='legendary').length,'most rewarded skins must be legendary');
+  assert.match(html,/id="skinOverlay" role="dialog" aria-modal="true"/);
+  assert.match(html,/기본 펭귄, 크롬 볼 1종과 캐릭터 스킨 9종/);
+  assert.match(html,/\.skin-grid\{[^}]*min-height:0[^}]*overflow-y:auto[^}]*touch-action:pan-y/);
+  assert.match(html,/grid-template-rows:auto auto minmax\(0,1fr\) auto/);
+  assert.match(html,/trail\.push\(\{x:player\.x,y:player\.y,a:\.58,skin:selectedSkinId/);
+  assert.equal(new Set(skins.map(skin=>skin.src)).size,skins.length,'every skin needs its own generated image asset');
+  for(const skin of skins){
+    assert.match(skin.src,/^assets\/skins\/[a-z0-9_]+\.png$/);
+    assert.ok(existsSync(new URL(`../public/${skin.src}`,import.meta.url)),`${skin.src} must exist`);
+  }
+  assert.match(viteConfig,/name: 'bounc-static-skin-assets'/);
+  assert.match(viteConfig,/fileName: `assets\/skins\/\$\{entry\.name\}`/);
+  assert.match(html,/const skinImages=new Map\(\)/);
+  assert.match(html,/art\.className='skin-preview-art';art\.src=skin\.src/);
+  assert.match(html,/function drawSkinImage\(skin,scale=1\)/);
+  assert.match(html,/const LEGENDARY_ECHO_COUNT=3/);
+  assert.match(html,/function drawLegendaryEchoes\(time\)/);
+  assert.match(frontendSource('drawPlayer','drawParticles'),/drawSkinImage\(skin\)/);
+  assert.doesNotMatch(html,/function drawOrbSkin|function drawCharacterSkin|skin\.icon/,'generated art must replace temporary orb drawing and emoji previews');
+  const imageSource=frontendSource('drawSkinImage','drawLegendaryEchoes');
+  assert.match(imageSource,/skinImages\.get\(skin\.id\)/);
+  assert.match(imageSource,/ctx\.drawImage\(img/);
+  const echoSource=frontendSource('drawLegendaryEchoes','drawPlayer');
+  assert.match(echoSource,/skin\.rarity!=='legendary'/);
+  assert.match(echoSource,/drawSkinImage\(skin,\.8\)/);
+  assert.doesNotMatch(echoSource,/player\.(?:x|y|vx|vy|rx|ry)\s*=/,'legendary echoes must not alter player physics');
+  assert.doesNotMatch(echoSource,/trail\.(?:push|shift|splice)/,'echo rendering must not mutate movement history');
+  const physicsSource=frontendSource('physicsStep','burst');
+  assert.doesNotMatch(physicsSource,/activeSkin|SKIN_BY_ID|rarity|legendary|extraJump|maxJumps|jumpCount|airJump/i);
+  assert.match(html,/전설의 3단 공중 잔상은 연출이며 점프력과 판정은 같습니다/);
+  assert.match(html,/className=`skin-option rarity-\$\{skin\.rarity\}/);
+  assert.match(html,/rarity\.className='skin-rarity'/);
+  assert.match(html,/emitSkinImpact\(player\.x,r\*TILE/);
+  assert.doesNotMatch(skinRegistry,/(?:speed|score|rx|ry|bounce)\s*:/i);
+
+  assert.match(tossBridge,/meta\[name="toss-rewarded-ad-group-id"\]/);
+  assert.match(tossBridge,/function preloadRewarded\(\)/);
+  assert.match(tossBridge,/function showRewarded\(\{ requestId = '', commitReward \} = \{\}\)/);
+  assert.match(tossBridge,/purchaseState\.status !== 'ad-supported'/);
+  assert.match(tossBridge,/fullScreenShowOwner = 'rewarded'/);
+  assert.match(tossBridge,/activeRewardedCancels\.delete\(cancel\)/);
+  assert.match(tossBridge,/void preloadRewarded\(\)/);
+
+  const consumeRewardEvent=tossBridgeFunction('consumeRewardEvent','getRewardedState');
+  let grants=0;
+  const commit=()=>{grants++;return true;};
+  const initial={earned:false,granted:false,reward:null};
+  const dismissed=consumeRewardEvent(initial,{type:'dismissed'},'session-1',commit);
+  assert.equal(dismissed,initial);
+  assert.equal(grants,0,'dismissed alone must never grant a skin');
+  const impression=consumeRewardEvent(initial,{type:'impression'},'session-1',commit);
+  assert.equal(impression,initial);
+  assert.equal(grants,0,'impression alone must never grant a skin');
+  const earned=consumeRewardEvent(initial,{type:'userEarnedReward',unitType:'스킨',unitAmount:1},'session-1',commit);
+  assert.deepEqual(earned,{earned:true,granted:true,reward:{unitType:'스킨',unitAmount:1}});
+  assert.equal(grants,1);
+  const duplicate=consumeRewardEvent(earned,{type:'userEarnedReward',unitType:'스킨',unitAmount:1},'session-1',commit);
+  assert.equal(duplicate,earned);
+  assert.equal(grants,1,'duplicate reward events must remain idempotent');
+
+  assert.match(html,/if\(status==='ad-free'\)unlockAllSkins\(\)/);
+  assert.match(html,/commitReward:\(\)=>commitSkinReward\(targetId,requestId\)/);
+  assert.match(html,/광고 1편을 끝까지 보면 \$\{target\.name\} 스킨을 영구 해제해요/);
+  assert.doesNotMatch(html,/30초 광고/);
 });
 
 test('published map metadata is locked until the layout is edited again', () => {

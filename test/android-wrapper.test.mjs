@@ -113,6 +113,7 @@ test('Toss validation checks a configured browser fallback URL while preserving 
     VITE_PUBLIC_APP_URL: '',
     TOSS_APP_NAME: 'penguin-bounce',
     VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: 'penguin-bounce-interstitial-production',
+    VITE_TOSS_REWARDED_AD_GROUP_ID: 'penguin-bounce-rewarded-production',
     VITE_TOSS_AD_FREE_SKU: 'ait.0000062458.d0bd5054.079e0dec8a.6635518646',
   };
 
@@ -148,9 +149,45 @@ test('Toss validation checks a configured browser fallback URL while preserving 
   assert.notEqual(placeholderAdGroup.status, 0);
   assert.match(placeholderAdGroup.stderr, /must not be a placeholder/);
 
+  const missingRewardedAdGroup = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_REWARDED_AD_GROUP_ID: '' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(missingRewardedAdGroup.status, 0);
+  assert.match(missingRewardedAdGroup.stderr, /VITE_TOSS_REWARDED_AD_GROUP_ID is required/);
+
+  const whitespaceRewardedAdGroup = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_REWARDED_AD_GROUP_ID: ' rewarded-production ' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(whitespaceRewardedAdGroup.status, 0);
+  assert.match(whitespaceRewardedAdGroup.stderr, /VITE_TOSS_REWARDED_AD_GROUP_ID must not contain whitespace/);
+
+  const testRewardedAdGroup = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_REWARDED_AD_GROUP_ID: 'ait-ad-test-rewarded-id' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(testRewardedAdGroup.status, 0);
+  assert.match(testRewardedAdGroup.stderr, /not an Apps in Toss test ID/);
+
+  const placeholderRewardedAdGroup = spawnSync(process.execPath, [script], {
+    cwd: projectRoot,
+    env: { ...baseEnvironment, VITE_TOSS_REWARDED_AD_GROUP_ID: 'replace-with-production-rewarded-id' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(placeholderRewardedAdGroup.status, 0);
+  assert.match(placeholderRewardedAdGroup.stderr, /VITE_TOSS_REWARDED_AD_GROUP_ID must not be a placeholder/);
+
   const developmentDefault = spawnSync(process.execPath, [script, '--development'], {
     cwd: projectRoot,
-    env: { ...baseEnvironment, VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: '' },
+    env: {
+      ...baseEnvironment,
+      VITE_TOSS_INTERSTITIAL_AD_GROUP_ID: '',
+      VITE_TOSS_REWARDED_AD_GROUP_ID: '',
+    },
     encoding: 'utf8',
   });
   assert.equal(developmentDefault.status, 0, developmentDefault.stderr);
@@ -226,16 +263,21 @@ test('Toss validation checks a configured browser fallback URL while preserving 
   assert.match(viteConfig, /VITE_TOSS_INTERSTITIAL_AD_GROUP_ID/);
   assert.match(viteConfig, /toss-interstitial-ad-group-id/);
   assert.match(viteConfig, /ait-ad-test-interstitial-id/);
+  assert.match(viteConfig, /VITE_TOSS_REWARDED_AD_GROUP_ID/);
+  assert.match(viteConfig, /toss-rewarded-ad-group-id/);
+  assert.match(viteConfig, /ait-ad-test-rewarded-id/);
   assert.match(viteConfig, /VITE_TOSS_AD_FREE_SKU/);
   assert.match(viteConfig, /toss-ad-free-sku/);
 });
 
-test('Toss ad-free SKU metadata is injected only into Toss HTML transforms', async () => {
+test('Toss ad and ad-free metadata are injected only into Toss HTML transforms', async () => {
   const { default: createViteConfig } = await import('../vite.config.mjs');
   const source = '<!doctype html><html><head></head><body></body></html>';
   const confirmedAdFreeSku = 'ait.0000062458.d0bd5054.079e0dec8a.6635518646';
   const previousAdFreeSku = process.env.VITE_TOSS_AD_FREE_SKU;
+  const previousRewardedAdGroupId = process.env.VITE_TOSS_REWARDED_AD_GROUP_ID;
   process.env.VITE_TOSS_AD_FREE_SKU = confirmedAdFreeSku;
+  process.env.VITE_TOSS_REWARDED_AD_GROUP_ID = 'penguin-bounce-rewarded-production';
 
   function transformForMode(mode) {
     const config = createViteConfig({ mode });
@@ -247,6 +289,7 @@ test('Toss ad-free SKU metadata is injected only into Toss HTML transforms', asy
     const tossResult = transformForMode('toss');
     const tossTagNames = tossResult.tags.map((tag) => tag.attrs?.name).filter(Boolean);
     assert.ok(tossTagNames.includes('toss-ad-free-sku'));
+    assert.ok(tossTagNames.includes('toss-rewarded-ad-group-id'));
     assert.ok(
       tossResult.tags.some(
         (tag) => tag.attrs?.name === 'toss-ad-free-sku' && tag.attrs?.content === confirmedAdFreeSku,
@@ -257,12 +300,15 @@ test('Toss ad-free SKU metadata is injected only into Toss HTML transforms', asy
     for (const mode of ['web', 'android']) {
       const result = transformForMode(mode);
       assert.ok(!result.tags.some((tag) => tag.attrs?.name === 'toss-ad-free-sku'));
+      assert.ok(!result.tags.some((tag) => tag.attrs?.name === 'toss-rewarded-ad-group-id'));
       assert.ok(!result.tags.some((tag) => tag.attrs?.src === '/toss-bridge.js'));
       assert.doesNotMatch(result.html, /toss-miniapp/);
     }
   } finally {
     if (previousAdFreeSku === undefined) delete process.env.VITE_TOSS_AD_FREE_SKU;
     else process.env.VITE_TOSS_AD_FREE_SKU = previousAdFreeSku;
+    if (previousRewardedAdGroupId === undefined) delete process.env.VITE_TOSS_REWARDED_AD_GROUP_ID;
+    else process.env.VITE_TOSS_REWARDED_AD_GROUP_ID = previousRewardedAdGroupId;
   }
 });
 
@@ -293,7 +339,8 @@ test('Android secrets stay ignored and privacy policy reflects actual online dat
   assert.match(privacy, /IP 주소 원문 대신 SHA-256/);
   assert.match(privacy, /Apps in Toss 통합 광고/);
   assert.match(privacy, /Google AdMob/);
-  assert.match(privacy, /광고 요청·노출·클릭 정보/);
+  assert.match(privacy, /광고 요청·노출·클릭·시청 완료와 보상 정보/);
+  assert.match(privacy, /해제·장착한 스킨 ID/);
   assert.match(privacy, /Google Play·ONEstore용 Android 앱과 일반 웹 배포판에는 광고 또는 인앱결제 SDK가 포함되지 않습니다/);
   assert.match(privacy, /주문 ID/);
   assert.match(privacy, /ait\.0000062458\.d0bd5054\.079e0dec8a\.6635518646/);
@@ -301,12 +348,13 @@ test('Android secrets stay ignored and privacy policy reflects actual online dat
   assert.match(privacy, /Google LLC/);
   assert.match(privacy, /Apple Inc\./);
   assert.match(privacy, /Cloudflare D1에는 결제 정보를 저장하지 않습니다/);
-  assert.match(privacy, /시행일: 2026년 8월 14일 · 문서 버전 1\.4/);
+  assert.match(privacy, /시행일: 2026년 8월 23일 · 문서 버전 1\.5/);
   assert.match(privacy, /hoon@jellysnow\.com/);
   assert.match(terms, /비소모품/);
   assert.match(terms, /구매 복원/);
   assert.match(terms, /환불이 완료되면 광고 제거 권한이 해제되고 광고가 다시 표시/);
-  assert.match(terms, /약관 버전: 2026-08-14-v2/);
+  assert.match(terms, /스페셜 스킨 10종을 광고 없이 해제/);
+  assert.match(terms, /약관 버전: 2026-08-23-v3/);
   assert.match(deletionGuide, /데이터 삭제는 결제 취소나 환불 신청이 아닙니다/);
   assert.match(deletionGuide, /구매 복원/);
   assert.match(releaseGuide, /최초 등록·업로드하기 전까지만/);

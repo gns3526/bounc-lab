@@ -11,6 +11,14 @@ const rawInterstitialAdGroupId =
 const interstitialAdGroupId = /^%VITE_[A-Z0-9_]+%$/.test(rawInterstitialAdGroupId)
   ? ''
   : rawInterstitialAdGroupId;
+const rawRewardedAdGroupId =
+  document
+    .querySelector('meta[name="toss-rewarded-ad-group-id"]')
+    ?.getAttribute('content')
+    ?.trim() || '';
+const rewardedAdGroupId = /^%VITE_[A-Z0-9_]+%$/.test(rawRewardedAdGroupId)
+  ? ''
+  : rawRewardedAdGroupId;
 const rawAdFreeSku =
   document.querySelector('meta[name="toss-ad-free-sku"]')?.getAttribute('content')?.trim() || '';
 const adFreeSku = /^%VITE_[A-Z0-9_]+%$/.test(rawAdFreeSku) ? '' : rawAdFreeSku;
@@ -21,6 +29,7 @@ const READY_EVENT = 'bounc:toss-ready';
 const ERROR_EVENT = 'bounc:toss-error';
 const PURCHASE_STATE_EVENT = 'bounc:toss-purchase-state';
 const INTERSTITIAL_TIMEOUT_MS = 90_000;
+const REWARDED_TIMEOUT_MS = 120_000;
 const AD_FREE_STORAGE_KEY = `bounc:ad-free:v1:${adFreeSku}`;
 
 let safeArea = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });
@@ -40,8 +49,13 @@ let purchasePromise = null;
 let interstitialLoaded = false;
 let interstitialLoadPromise = null;
 let interstitialShowPromise = null;
+let rewardedLoaded = false;
+let rewardedLoadPromise = null;
+let rewardedShowing = false;
+let fullScreenShowOwner = '';
 let bridgeDisposed = false;
 const activeInterstitialCancels = new Set();
+const activeRewardedCancels = new Set();
 const activePurchaseCancels = new Set();
 
 if (isTossMiniapp) {
@@ -162,8 +176,13 @@ async function initializeTossSdk() {
     () => {
       bridgeDisposed = true;
       for (const cancel of [...activeInterstitialCancels]) cancel();
+      for (const cancel of [...activeRewardedCancels]) cancel();
       for (const cancel of [...activePurchaseCancels]) cancel();
-      for (const cleanup of cleanups.splice(0)) cleanup?.();
+      for (const cleanup of cleanups.splice(0)) {
+        try {
+          cleanup?.();
+        } catch (_) {}
+      }
     },
     { once: true },
   );
@@ -238,6 +257,13 @@ function disableInterstitial() {
   for (const cancel of [...activeInterstitialCancels]) cancel();
 }
 
+function disableRewarded() {
+  rewardedLoaded = false;
+  if (!rewardedShowing) {
+    for (const cancel of [...activeRewardedCancels]) cancel();
+  }
+}
+
 function isConfirmedAdSupported() {
   return purchaseState.status === 'ad-supported';
 }
@@ -251,10 +277,18 @@ function setPurchaseState(status, patch = {}) {
     ...patch,
   });
 
-  if (status !== 'ad-supported') disableInterstitial();
+  if (status !== 'ad-supported') {
+    disableInterstitial();
+    disableRewarded();
+  }
   if (!bridgeDisposed) {
     window.dispatchEvent(new CustomEvent(PURCHASE_STATE_EVENT, { detail: purchaseState }));
-    if (status === 'ad-supported') queueMicrotask(() => void preloadInterstitial());
+    if (status === 'ad-supported') {
+      queueMicrotask(() => {
+        void preloadInterstitial();
+        void preloadRewarded();
+      });
+    }
   }
   return purchaseState;
 }
@@ -529,6 +563,7 @@ function purchaseAdFree() {
     bridgeDisposed ||
     !isTossMiniapp ||
     !adFreeSku ||
+    fullScreenShowOwner ||
     purchaseState.status === 'checking' ||
     purchaseState.status === 'pending'
   ) {
@@ -695,7 +730,9 @@ function showInterstitial() {
     bridgeDisposed ||
     !isTossMiniapp ||
     !interstitialAdGroupId ||
-    !isConfirmedAdSupported()
+    !isConfirmedAdSupported() ||
+    fullScreenShowOwner ||
+    purchasePromise
   ) {
     return Promise.resolve(false);
   }
@@ -706,6 +743,7 @@ function showInterstitial() {
   }
 
   interstitialLoaded = false;
+  fullScreenShowOwner = 'interstitial';
   interstitialShowPromise = requireSdk()
     .then(({ showFullScreenAd }) => {
       if (!isSupported(showFullScreenAd)) return false;
@@ -768,10 +806,239 @@ function showInterstitial() {
     .catch(() => false)
     .finally(() => {
       interstitialShowPromise = null;
+      if (fullScreenShowOwner === 'interstitial') fullScreenShowOwner = '';
       void preloadInterstitial();
     });
 
   return interstitialShowPromise;
+}
+
+function consumeRewardEvent(state, event, requestId, commitReward) {
+  const current = state || { earned: false, granted: false, reward: null };
+  if (event?.type !== 'userEarnedReward' || current.earned) return current;
+  const reward = Object.freeze({
+    unitType: String(event?.unitType || ''),
+    unitAmount: Number(event?.unitAmount) || 0,
+  });
+  let granted = false;
+  try {
+    granted = typeof commitReward === 'function'
+      ? commitReward({ requestId, reward }) !== false
+      : false;
+  } catch (_) {
+    granted = false;
+  }
+  return Object.freeze({ earned: true, granted, reward });
+}
+
+function getRewardedState() {
+  return Object.freeze({
+    configured: Boolean(isTossMiniapp && rewardedAdGroupId),
+    ready: rewardedLoaded,
+    loading: Boolean(rewardedLoadPromise),
+    showing: rewardedShowing,
+  });
+}
+
+function preloadRewarded() {
+  if (
+    bridgeDisposed ||
+    !isTossMiniapp ||
+    !rewardedAdGroupId ||
+    purchaseState.status !== 'ad-supported' ||
+    rewardedShowing
+  ) {
+    return Promise.resolve(false);
+  }
+  if (rewardedLoaded) return Promise.resolve(true);
+  if (rewardedLoadPromise) return rewardedLoadPromise;
+
+  rewardedLoadPromise = requireSdk()
+    .then(({ loadFullScreenAd }) => {
+      if (!isSupported(loadFullScreenAd)) return false;
+      return new Promise((resolve) => {
+        let cleanup;
+        let finished = false;
+        let timeoutId;
+        const finish = (loaded) => {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timeoutId);
+          activeRewardedCancels.delete(cancel);
+          try {
+            cleanup?.();
+          } catch (_) {}
+          rewardedLoaded = Boolean(loaded && purchaseState.status === 'ad-supported');
+          resolve(rewardedLoaded);
+        };
+        const cancel = () => finish(false);
+        activeRewardedCancels.add(cancel);
+        timeoutId = setTimeout(cancel, REWARDED_TIMEOUT_MS);
+        try {
+          cleanup = loadFullScreenAd({
+            options: { adGroupId: rewardedAdGroupId },
+            onEvent: (event) => {
+              if (event?.type === 'loaded') finish(true);
+            },
+            onError: cancel,
+          });
+          if (finished) cleanup?.();
+        } catch (_) {
+          cancel();
+        }
+      });
+    })
+    .catch(() => false)
+    .finally(() => {
+      rewardedLoadPromise = null;
+    });
+  return rewardedLoadPromise;
+}
+
+function showRewarded({ requestId = '', commitReward } = {}) {
+  const normalizedRequestId = String(requestId || '').trim();
+  if (
+    bridgeDisposed ||
+    !isTossMiniapp ||
+    !rewardedAdGroupId ||
+    purchaseState.status !== 'ad-supported' ||
+    rewardedShowing ||
+    fullScreenShowOwner ||
+    purchasePromise
+  ) {
+    return Promise.resolve(
+      Object.freeze({
+        requestId: normalizedRequestId,
+        shown: false,
+        earned: false,
+        granted: false,
+        outcome: rewardedShowing || fullScreenShowOwner ? 'busy' : 'unavailable',
+        reward: null,
+      }),
+    );
+  }
+  if (!rewardedLoaded) {
+    void preloadRewarded();
+    return Promise.resolve(
+      Object.freeze({
+        requestId: normalizedRequestId,
+        shown: false,
+        earned: false,
+        granted: false,
+        outcome: 'not-ready',
+        reward: null,
+      }),
+    );
+  }
+
+  rewardedLoaded = false;
+  rewardedShowing = true;
+  fullScreenShowOwner = 'rewarded';
+  return requireSdk()
+    .then(({ showFullScreenAd }) => {
+      if (!isSupported(showFullScreenAd)) {
+        return Object.freeze({
+          requestId: normalizedRequestId,
+          shown: false,
+          earned: false,
+          granted: false,
+          outcome: 'unsupported',
+          reward: null,
+        });
+      }
+      return new Promise((resolve) => {
+        let cleanup;
+        let finished = false;
+        let shown = false;
+        let earned = false;
+        let granted = false;
+        let reward = null;
+        let pageWasHidden = false;
+        let timeoutId;
+        let returnGraceId;
+        const finish = (outcome) => {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timeoutId);
+          clearTimeout(returnGraceId);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          activeRewardedCancels.delete(cancel);
+          try {
+            cleanup?.();
+          } catch (_) {}
+          resolve(
+            Object.freeze({
+              requestId: normalizedRequestId,
+              shown,
+              earned,
+              granted,
+              outcome,
+              reward,
+            }),
+          );
+        };
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            pageWasHidden = true;
+            return;
+          }
+          // Android versions that omit `dismissed` can make the WebView visible
+          // just before the final reward callback. Wait briefly for the SDK event;
+          // this timer only closes the lifecycle and never grants a reward.
+          if (pageWasHidden && shown && !returnGraceId) {
+            returnGraceId = setTimeout(() => finish('returned'), 1_200);
+          }
+        };
+        const cancel = () => finish(shown ? 'timeout' : 'canceled');
+        activeRewardedCancels.add(cancel);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        timeoutId = setTimeout(cancel, REWARDED_TIMEOUT_MS);
+        try {
+          cleanup = showFullScreenAd({
+            options: { adGroupId: rewardedAdGroupId },
+            onEvent: (event) => {
+              const type = event?.type;
+              if (type === 'show' || type === 'impression' || type === 'clicked') shown = true;
+              if (type === 'userEarnedReward') {
+                shown = true;
+                const rewardState = consumeRewardEvent(
+                  { earned, granted, reward },
+                  event,
+                  normalizedRequestId,
+                  commitReward,
+                );
+                earned = rewardState.earned;
+                granted = rewardState.granted;
+                reward = rewardState.reward;
+              } else if (type === 'dismissed') {
+                finish('dismissed');
+              } else if (type === 'failedToShow') {
+                finish('failed-to-show');
+              }
+            },
+            onError: () => finish('error'),
+          });
+          if (finished) cleanup?.();
+        } catch (_) {
+          finish('error');
+        }
+      });
+    })
+    .catch(() =>
+      Object.freeze({
+        requestId: normalizedRequestId,
+        shown: false,
+        earned: false,
+        granted: false,
+        outcome: 'error',
+        reward: null,
+      }),
+    )
+    .finally(() => {
+      rewardedShowing = false;
+      if (fullScreenShowOwner === 'rewarded') fullScreenShowOwner = '';
+      void preloadRewarded();
+    });
 }
 
 const bridge = Object.freeze({
@@ -783,7 +1050,13 @@ const bridge = Object.freeze({
   },
   User: Object.freeze({ getAnonymousKey }),
   Game: Object.freeze({ getUserProfile }),
-  Ads: Object.freeze({ preloadInterstitial, showInterstitial }),
+  Ads: Object.freeze({
+    preloadInterstitial,
+    showInterstitial,
+    preloadRewarded,
+    showRewarded,
+    getRewardedState,
+  }),
   Purchases: Object.freeze({
     getState: () => purchaseState,
     subscribe: (listener) => subscribeWindowEvent(PURCHASE_STATE_EVENT, listener),

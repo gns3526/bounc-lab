@@ -19,6 +19,9 @@ const publicAppUrl = env.VITE_PUBLIC_APP_URL?.trim() || '';
 const rawInterstitialAdGroupId = env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID;
 const interstitialAdGroupId =
   rawInterstitialAdGroupId?.trim() || (isDevelopment ? 'ait-ad-test-interstitial-id' : '');
+const rawRewardedAdGroupId = env.VITE_TOSS_REWARDED_AD_GROUP_ID;
+const rewardedAdGroupId =
+  rawRewardedAdGroupId?.trim() || (isDevelopment ? 'ait-ad-test-rewarded-id' : '');
 const confirmedAdFreeSku = 'ait.0000062458.d0bd5054.079e0dec8a.6635518646';
 const rawAdFreeSku = env.VITE_TOSS_AD_FREE_SKU;
 const adFreeSku = rawAdFreeSku?.trim() || '';
@@ -130,6 +133,26 @@ if (!isDevelopment) {
       )
     ) {
       errors.push('VITE_TOSS_INTERSTITIAL_AD_GROUP_ID must not be a placeholder value.');
+    }
+  }
+
+  if (!rewardedAdGroupId) {
+    errors.push('VITE_TOSS_REWARDED_AD_GROUP_ID is required for a production Toss build.');
+  } else {
+    if (rawRewardedAdGroupId !== rewardedAdGroupId || /\s/.test(rewardedAdGroupId)) {
+      errors.push('VITE_TOSS_REWARDED_AD_GROUP_ID must not contain whitespace.');
+    }
+    if (/^ait-ad-test-/i.test(rewardedAdGroupId)) {
+      errors.push(
+        'VITE_TOSS_REWARDED_AD_GROUP_ID must use a production ad group ID, not an Apps in Toss test ID.',
+      );
+    }
+    if (
+      /(?:placeholder|replace[-_ ]?with|change[-_ ]?me|your[-_ ]|example|<|>)/i.test(
+        rewardedAdGroupId,
+      )
+    ) {
+      errors.push('VITE_TOSS_REWARDED_AD_GROUP_ID must not be a placeholder value.');
     }
   }
 

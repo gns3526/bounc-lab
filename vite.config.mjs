@@ -1,8 +1,28 @@
 import { defineConfig, loadEnv } from 'vite';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const CONFIRMED_APP_NAME = 'penguin-bounce';
 const TOSS_TEST_INTERSTITIAL_AD_GROUP_ID = 'ait-ad-test-interstitial-id';
+const TOSS_TEST_REWARDED_AD_GROUP_ID = 'ait-ad-test-rewarded-id';
+
+function emitSkinAssets() {
+  const skinDirectory = resolve(process.cwd(), 'public/assets/skins');
+  return {
+    name: 'bounc-static-skin-assets',
+    apply: 'build',
+    generateBundle() {
+      for (const entry of readdirSync(skinDirectory, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith('.png')) continue;
+        this.emitFile({
+          type: 'asset',
+          fileName: `assets/skins/${entry.name}`,
+          source: readFileSync(resolve(skinDirectory, entry.name)),
+        });
+      }
+    },
+  };
+}
 
 function addHtmlClass(html, className) {
   return html.replace(/<html\b([^>]*)>/i, (tag, attributes) => {
@@ -55,6 +75,10 @@ export default defineConfig(({ mode }) => {
     env.VITE_TOSS_INTERSTITIAL_AD_GROUP_ID ||
     (mode === 'toss-dev' ? TOSS_TEST_INTERSTITIAL_AD_GROUP_ID : '')
   ).trim();
+  const tossRewardedAdGroupId = (
+    env.VITE_TOSS_REWARDED_AD_GROUP_ID ||
+    (mode === 'toss-dev' ? TOSS_TEST_REWARDED_AD_GROUP_ID : '')
+  ).trim();
   const tossAdFreeSku = (env.VITE_TOSS_AD_FREE_SKU || '').trim();
   const localApiProxy = (env.LOCAL_API_PROXY_URL || 'http://127.0.0.1:8787').trim();
 
@@ -88,6 +112,7 @@ export default defineConfig(({ mode }) => {
       proxy: { '/api': localApiProxy },
     },
     plugins: [
+      emitSkinAssets(),
       {
         name: 'bounc-toss-html',
         transformIndexHtml: {
@@ -126,6 +151,14 @@ export default defineConfig(({ mode }) => {
                   attrs: {
                     name: 'toss-interstitial-ad-group-id',
                     content: tossInterstitialAdGroupId,
+                  },
+                  injectTo: 'head-prepend',
+                },
+                {
+                  tag: 'meta',
+                  attrs: {
+                    name: 'toss-rewarded-ad-group-id',
+                    content: tossRewardedAdGroupId,
                   },
                   injectTo: 'head-prepend',
                 },
